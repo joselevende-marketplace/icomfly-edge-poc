@@ -1,0 +1,11 @@
+{
+  "name": "icomfly-edge-poc",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Demo desechable: storefront iComfly horneado a HTML estatico y republicado al CDN automaticamente. Lee solo APIs publicas. Borrable sin afectar nada.",
+  "scripts": {
+    "publish": "node publish.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

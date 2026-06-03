@@ -1,0 +1,43 @@
+name: Republicar storefronts al edge
+
+# Ciclo automatico: cada ~10 min (y a demanda) re-hornea las tiendas leyendo la
+# API publica de iComfly y republica al CDN (GitHub Pages). Asi, cuando una tienda
+# cambia su diseno/productos en el panel de iComfly, su pagina del edge se actualiza
+# SOLA, sin que nadie toque nada. (En produccion esto seria un hook al guardar +
+# Cloudflare; aqui se demuestra el ciclo automatico completo.)
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # GitHub puede demorar el cron unos minutos
+  workflow_dispatch:          # boton "Run workflow" manual
+  push:
+    branches: [ main ]        # republica al hacer cambios en los scripts
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Hornear tiendas (lee API publica de iComfly)
+        run: node publish.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

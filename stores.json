@@ -1,0 +1,14 @@
+{
+  "_comment": "Lista de tiendas a hornear por el publicador (publish.mjs). En produccion esta lista la generaria el backend (todas las tiendas activas). Aqui se configura manual para el POC.",
+  "stores": [
+    {
+      "slug": "joselevende",
+      "store_id": 11,
+      "currency": "COP",
+      "currency_symbol": "$",
+      "currency_locale": "es-CO",
+      "whatsapp": "573000000000",
+      "store_name": "Joselevende"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+/**
+ * PUBLISH (Publicador) — Fase 1
+ * ------------------------------
+ * Hornea TODAS las tiendas listadas en stores.json y, opcionalmente, las
+ * despliega al CDN en vivo (repo demo de GitHub Pages) con --deploy.
+ *
+ * En produccion, este publicador lo dispararia el backend cada vez que una
+ * tienda guarda cambios (o un cron cada X minutos). Aqui es un script
+ * autonomo que NO toca el backend de iComfly.
+ *
+ * Uso:
+ *   node publish.mjs              -> hornea todas las tiendas de stores.json
+ *   node publish.mjs --deploy     -> hornea y ademas git push al repo demo
+ *
+ * El deploy usa el repo git que vive en dist/ (remote origin = repo demo).
+ */
+
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const exec = promisify(execFile);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST = join(__dirname, 'dist');
+const DEPLOY = process.argv.includes('--deploy');
+
+function log(m) {
+  console.log(`[publish] ${m}`);
+}
+
+async function bakeStore(s) {
+  const env = { ...process.env };
+  if (s.store_id) env.STORE_ID = String(s.store_id);
+  if (s.currency) env.CURRENCY = s.currency;
+  if (s.currency_symbol) env.CURRENCY_SYMBOL = s.currency_symbol;
+  if (s.currency_locale) env.CURRENCY_LOCALE = s.currency_locale;
+  if (s.whatsapp) env.WHATSAPP = s.whatsapp;
+  if (s.store_name) env.STORE_NAME = s.store_name;
+
+  const { stdout } = await exec('node', ['bake.mjs', s.slug], { cwd: __dirname, env });
+  // Mostrar solo la linea LISTO de cada bake
+  const done = stdout.split('\n').find((l) => l.includes('LISTO')) || '(horneado)';
+  log(`  ${s.slug}: ${done.replace('[bake] ', '')}`);
+}
+
+function indexHtml(stores) {
+  const links = stores
+    .map(
+      (s) =>
+        `<li><a href="./${s.slug}/">${s.store_name || s.slug}</a> <span class="muted">/${s.slug}/</span></li>`
+    )
+    .join('\n');
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iComfly Edge — tiendas horneadas</title>
+<style>body{font-family:Inter,system-ui,sans-serif;background:#f7f8fa;color:#1f2430;max-width:680px;margin:40px auto;padding:0 18px}
+h1{font-size:1.4rem}ul{line-height:2.2;list-style:none;padding:0}a{color:#108EE3;font-weight:600;text-decoration:none}
+.muted{color:#7b8494;font-size:.8rem}.note{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(16,24,40,.08);margin-top:16px;font-size:.9rem;color:#555}</style>
+</head><body>
+<h1>iComfly Edge — tiendas horneadas (CDN)</h1>
+<ul>${links}</ul>
+<div class="note">Banco de pruebas de velocidad (Fase 0-2). Cada tienda es HTML estatico servido desde el edge, sin depender del backend de iComfly para mostrarse.</div>
+</body></html>`;
+}
+
+async function git(args) {
+  const { stdout } = await exec('git', args, { cwd: DIST });
+  return stdout.trim();
+}
+
+async function deploy() {
+  log('Desplegando dist/ al repo demo (GitHub Pages)...');
+  await git(['add', '-A']);
+  // Si no hay cambios, commit falla; lo toleramos.
+  try {
+    const stamp = new Date().toISOString();
+    await exec(
+      'git',
+      ['-c', 'user.name=joselevende-marketplace', '-c', 'user.email=soporte@joselevende.com', 'commit', '-q', '-m', `republicar tiendas horneadas ${stamp}`],
+      { cwd: DIST }
+    );
+  } catch (e) {
+    log('  (sin cambios que commitear)');
+  }
+  await git(['push', '-q', 'origin', 'main']);
+  log('  push OK -> el CDN se actualiza en ~1 min');
+}
+
+async function main() {
+  const cfg = JSON.parse(await readFile(join(__dirname, 'stores.json'), 'utf8'));
+  const stores = cfg.stores || [];
+  log(`Tiendas a hornear: ${stores.length}`);
+
+  await mkdir(DIST, { recursive: true });
+  for (const s of stores) {
+    await bakeStore(s);
+  }
+
+  // Indice raiz
+  await writeFile(join(DIST, 'index.html'), indexHtml(stores), 'utf8');
+  await writeFile(join(DIST, '.nojekyll'), '', 'utf8');
+  log('Indice raiz generado.');
+
+  if (DEPLOY) {
+    await deploy();
+  } else {
+    log('Hecho (local). Usa --deploy para publicar al CDN.');
+  }
+}
+
+main().catch((e) => {
+  console.error(`[publish] ERROR: ${e.message}`);
+  process.exit(1);
+});
