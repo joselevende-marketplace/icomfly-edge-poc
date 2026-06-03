@@ -14,7 +14,7 @@
     header.hero{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;padding:36px 20px;text-align:center}
     header.hero h1{font-size:1.9rem;font-weight:800;letter-spacing:-.5px}
     header.hero p{opacity:.9;margin-top:6px;font-size:.95rem}
-    main{max-width:1180px;margin:0 auto;padding:26px 16px 60px}
+    main{max-width:1180px;margin:0 auto;padding:26px 16px 80px}
     .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
     .card{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.08);transition:transform .12s,box-shadow .12s;display:flex;flex-direction:column}
     .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(16,24,40,.14)}
@@ -27,11 +27,30 @@
     .card-prices{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
     .price{font-size:1.12rem;font-weight:800;color:var(--text)}
     .compare{font-size:.85rem;color:var(--muted);text-decoration:line-through}
-    .buy{margin-top:auto;text-align:center;background:var(--primary);color:#fff;text-decoration:none;font-weight:700;padding:9px 12px;border-radius:10px;font-size:.9rem}
+    .buy{margin-top:auto;cursor:pointer;border:0;text-align:center;background:var(--primary);color:#fff;font-weight:700;padding:10px 12px;border-radius:10px;font-size:.9rem}
     .buy:hover{filter:brightness(.94)}
     .empty{text-align:center;color:var(--muted);padding:60px 20px}
     footer.ico{text-align:center;color:var(--muted);font-size:.8rem;padding:24px}
-    .meta{text-align:center;color:var(--muted);font-size:.72rem;padding:4px 0 0}</style>
+    .meta{text-align:center;color:var(--muted);font-size:.72rem;padding:4px 0 0}
+    /* Carrito */
+    .cart-fab{position:fixed;right:18px;bottom:18px;z-index:40;background:var(--primary);color:#fff;border:0;cursor:pointer;border-radius:999px;padding:14px 18px;font-weight:800;box-shadow:0 8px 24px rgba(16,24,40,.25);display:flex;align-items:center;gap:8px}
+    .cart-fab .count{background:#fff;color:var(--primary);border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.8rem;padding:0 6px}
+    .drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none}
+    .drawer-bg.open{display:block}
+    .drawer{position:fixed;top:0;right:0;height:100%;width:min(400px,92vw);background:#fff;z-index:51;transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column}
+    .drawer.open{transform:translateX(0)}
+    .drawer h2{padding:18px 18px 10px;font-size:1.1rem;display:flex;justify-content:space-between;align-items:center}
+    .drawer .close{cursor:pointer;border:0;background:none;font-size:1.4rem;color:var(--muted)}
+    .drawer .items{flex:1;overflow:auto;padding:6px 18px}
+    .ci{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #eef1f5}
+    .ci img{width:54px;height:54px;object-fit:cover;border-radius:8px;background:#eef1f5}
+    .ci .info{flex:1;font-size:.86rem}
+    .ci .qty{display:flex;align-items:center;gap:6px;margin-top:4px}
+    .ci .qty button{width:24px;height:24px;border:1px solid #ddd;background:#fff;border-radius:6px;cursor:pointer}
+    .drawer .foot{padding:16px 18px;border-top:1px solid #eef1f5}
+    .drawer .total{display:flex;justify-content:space-between;font-weight:800;margin-bottom:12px}
+    .wa{display:block;width:100%;text-align:center;background:#25D366;color:#fff;border:0;cursor:pointer;font-weight:800;padding:13px;border-radius:12px;font-size:.95rem;text-decoration:none}
+    .cart-empty{color:var(--muted);text-align:center;padding:40px 10px}</style>
 </head>
 <body>
   <header class="hero">
@@ -46,10 +65,10 @@
         <div class="card-body">
           <h3 class="card-title">zapato (Copia)</h3>
           <div class="card-prices">
-            <span class="price">Q 360,000</span>
-            <span class="compare">Q 400,000</span>
+            <span class="price">$ 360.000</span>
+            <span class="compare">$ 400.000</span>
           </div>
-          <a class="buy" href="#producto-3579" data-id="3579">Ver producto</a>
+          <button class="buy" type="button" data-add="3579">Agregar al carrito</button>
         </div>
       </article>
 
@@ -58,10 +77,10 @@
         <div class="card-body">
           <h3 class="card-title">Closet Armario Portátil Grande Organizador De Ropa</h3>
           <div class="card-prices">
-            <span class="price">Q 145,800</span>
-            <span class="compare">Q 208,300</span>
+            <span class="price">$ 145.800</span>
+            <span class="compare">$ 208.300</span>
           </div>
-          <a class="buy" href="#producto-3432" data-id="3432">Ver producto</a>
+          <button class="buy" type="button" data-add="3432">Agregar al carrito</button>
         </div>
       </article>
 
@@ -70,10 +89,10 @@
         <div class="card-body">
           <h3 class="card-title">Cobija Mágica Manta Térmica Brilla En Oscuridad</h3>
           <div class="card-prices">
-            <span class="price">Q 105,400</span>
-            <span class="compare">Q 150,500</span>
+            <span class="price">$ 105.400</span>
+            <span class="compare">$ 150.500</span>
           </div>
-          <a class="buy" href="#producto-3431" data-id="3431">Ver producto</a>
+          <button class="buy" type="button" data-add="3431">Agregar al carrito</button>
         </div>
       </article>
 
@@ -82,10 +101,10 @@
         <div class="card-body">
           <h3 class="card-title">Organizador Zapatero Metálico Shoe Rack 6 Niveles</h3>
           <div class="card-prices">
-            <span class="price">Q 82,400</span>
-            <span class="compare">Q 117,800</span>
+            <span class="price">$ 82.400</span>
+            <span class="compare">$ 117.800</span>
           </div>
-          <a class="buy" href="#producto-3430" data-id="3430">Ver producto</a>
+          <button class="buy" type="button" data-add="3430">Agregar al carrito</button>
         </div>
       </article>
 
@@ -94,10 +113,10 @@
         <div class="card-body">
           <h3 class="card-title">Sarten Antiadherente Negra 4 Puestos Ideal Para Huevos Panqueques Y Arepa</h3>
           <div class="card-prices">
-            <span class="price">Q 87,300</span>
-            <span class="compare">Q 124,800</span>
+            <span class="price">$ 87.300</span>
+            <span class="compare">$ 124.800</span>
           </div>
-          <a class="buy" href="#producto-3429" data-id="3429">Ver producto</a>
+          <button class="buy" type="button" data-add="3429">Agregar al carrito</button>
         </div>
       </article>
 
@@ -106,10 +125,10 @@
         <div class="card-body">
           <h3 class="card-title">Esterilizador Cepillo Dental Organizador Moderno Y Seguro</h3>
           <div class="card-prices">
-            <span class="price">Q 73,600</span>
-            <span class="compare">Q 105,800</span>
+            <span class="price">$ 73.600</span>
+            <span class="compare">$ 105.800</span>
           </div>
-          <a class="buy" href="#producto-3304" data-id="3304">Ver producto</a>
+          <button class="buy" type="button" data-add="3304">Agregar al carrito</button>
         </div>
       </article>
 
@@ -118,10 +137,10 @@
         <div class="card-body">
           <h3 class="card-title">Báscula Digital Inteligente Bluetooth – Mide Grasa, Músculo y Peso desde tu Celular</h3>
           <div class="card-prices">
-            <span class="price">Q 89,800</span>
-            <span class="compare">Q 150,000</span>
+            <span class="price">$ 89.800</span>
+            <span class="compare">$ 150.000</span>
           </div>
-          <a class="buy" href="#producto-3255" data-id="3255">Ver producto</a>
+          <button class="buy" type="button" data-add="3255">Agregar al carrito</button>
         </div>
       </article>
 
@@ -130,10 +149,10 @@
         <div class="card-body">
           <h3 class="card-title">pastillas 60 capsulas</h3>
           <div class="card-prices">
-            <span class="price">Q 0</span>
+            <span class="price">$ 0</span>
             
           </div>
-          <a class="buy" href="#producto-1624" data-id="1624">Ver producto</a>
+          <button class="buy" type="button" data-add="1624">Agregar al carrito</button>
         </div>
       </article>
 
@@ -142,10 +161,10 @@
         <div class="card-body">
           <h3 class="card-title">Pastillas 60 capsulas </h3>
           <div class="card-prices">
-            <span class="price">Q 100,000</span>
+            <span class="price">$ 100.000</span>
             
           </div>
-          <a class="buy" href="#producto-1623" data-id="1623">Ver producto</a>
+          <button class="buy" type="button" data-add="1623">Agregar al carrito</button>
         </div>
       </article>
 
@@ -154,10 +173,10 @@
         <div class="card-body">
           <h3 class="card-title">X4 bisagras cierre lento</h3>
           <div class="card-prices">
-            <span class="price">Q 38,400</span>
+            <span class="price">$ 38.400</span>
             
           </div>
-          <a class="buy" href="#producto-1320" data-id="1320">Ver producto</a>
+          <button class="buy" type="button" data-add="1320">Agregar al carrito</button>
         </div>
       </article>
 
@@ -166,10 +185,10 @@
         <div class="card-body">
           <h3 class="card-title">Reflector</h3>
           <div class="card-prices">
-            <span class="price">Q 129,900</span>
-            <span class="compare">Q 200,000</span>
+            <span class="price">$ 129.900</span>
+            <span class="compare">$ 200.000</span>
           </div>
-          <a class="buy" href="#producto-1319" data-id="1319">Ver producto</a>
+          <button class="buy" type="button" data-add="1319">Agregar al carrito</button>
         </div>
       </article>
 
@@ -178,10 +197,10 @@
         <div class="card-body">
           <h3 class="card-title">placas repara bisagras</h3>
           <div class="card-prices">
-            <span class="price">Q 8,124</span>
+            <span class="price">$ 8.124</span>
             
           </div>
-          <a class="buy" href="#producto-1316" data-id="1316">Ver producto</a>
+          <button class="buy" type="button" data-add="1316">Agregar al carrito</button>
         </div>
       </article>
 
@@ -190,10 +209,10 @@
         <div class="card-body">
           <h3 class="card-title">Reflector Solar 3 Cabezales 5 metros cable</h3>
           <div class="card-prices">
-            <span class="price">Q 129,900</span>
-            <span class="compare">Q 200,000</span>
+            <span class="price">$ 129.900</span>
+            <span class="compare">$ 200.000</span>
           </div>
-          <a class="buy" href="#producto-1308" data-id="1308">Ver producto</a>
+          <button class="buy" type="button" data-add="1308">Agregar al carrito</button>
         </div>
       </article>
 
@@ -202,10 +221,10 @@
         <div class="card-body">
           <h3 class="card-title">Adaptador de prueba</h3>
           <div class="card-prices">
-            <span class="price">Q 20,000</span>
-            <span class="compare">Q 70,000</span>
+            <span class="price">$ 20.000</span>
+            <span class="compare">$ 70.000</span>
           </div>
-          <a class="buy" href="#producto-1300" data-id="1300">Ver producto</a>
+          <button class="buy" type="button" data-add="1300">Agregar al carrito</button>
         </div>
       </article>
 
@@ -214,10 +233,10 @@
         <div class="card-body">
           <h3 class="card-title">Restaura tu cuero con el Adhesivo de cuero sintetico 50 x 137cm</h3>
           <div class="card-prices">
-            <span class="price">Q 69,900</span>
-            <span class="compare">Q 110,000</span>
+            <span class="price">$ 69.900</span>
+            <span class="compare">$ 110.000</span>
           </div>
-          <a class="buy" href="#producto-1295" data-id="1295">Ver producto</a>
+          <button class="buy" type="button" data-add="1295">Agregar al carrito</button>
         </div>
       </article>
 
@@ -226,10 +245,10 @@
         <div class="card-body">
           <h3 class="card-title">Adaptador de disco para taladro</h3>
           <div class="card-prices">
-            <span class="price">Q 58,900</span>
-            <span class="compare">Q 70,000</span>
+            <span class="price">$ 58.900</span>
+            <span class="compare">$ 70.000</span>
           </div>
-          <a class="buy" href="#producto-1294" data-id="1294">Ver producto</a>
+          <button class="buy" type="button" data-add="1294">Agregar al carrito</button>
         </div>
       </article>
 
@@ -238,10 +257,10 @@
         <div class="card-body">
           <h3 class="card-title">Dobladora de tubos huth americana con todo el juego de dados 3, 3.5 , 4 y 5 pulgadas</h3>
           <div class="card-prices">
-            <span class="price">Q 55,000,000</span>
+            <span class="price">$ 55.000.000</span>
             
           </div>
-          <a class="buy" href="#producto-1125" data-id="1125">Ver producto</a>
+          <button class="buy" type="button" data-add="1125">Agregar al carrito</button>
         </div>
       </article>
 
@@ -250,10 +269,10 @@
         <div class="card-body">
           <h3 class="card-title">zapato</h3>
           <div class="card-prices">
-            <span class="price">Q 360,000</span>
-            <span class="compare">Q 400,000</span>
+            <span class="price">$ 360.000</span>
+            <span class="compare">$ 400.000</span>
           </div>
-          <a class="buy" href="#producto-1093" data-id="1093">Ver producto</a>
+          <button class="buy" type="button" data-add="1093">Agregar al carrito</button>
         </div>
       </article>
 
@@ -262,10 +281,10 @@
         <div class="card-body">
           <h3 class="card-title">Acaba con las cucarachas , jeringa + 10 protectores de drenaje gratis</h3>
           <div class="card-prices">
-            <span class="price">Q 59,900</span>
+            <span class="price">$ 59.900</span>
             
           </div>
-          <a class="buy" href="#producto-1091" data-id="1091">Ver producto</a>
+          <button class="buy" type="button" data-add="1091">Agregar al carrito</button>
         </div>
       </article>
 
@@ -274,10 +293,10 @@
         <div class="card-body">
           <h3 class="card-title">cargador tipo c</h3>
           <div class="card-prices">
-            <span class="price">Q 70,000</span>
+            <span class="price">$ 70.000</span>
             
           </div>
-          <a class="buy" href="#producto-1088" data-id="1088">Ver producto</a>
+          <button class="buy" type="button" data-add="1088">Agregar al carrito</button>
         </div>
       </article>
 
@@ -286,10 +305,10 @@
         <div class="card-body">
           <h3 class="card-title">gel en jeringa anti cucarachas</h3>
           <div class="card-prices">
-            <span class="price">Q 59,900</span>
+            <span class="price">$ 59.900</span>
             
           </div>
-          <a class="buy" href="#producto-1075" data-id="1075">Ver producto</a>
+          <button class="buy" type="button" data-add="1075">Agregar al carrito</button>
         </div>
       </article>
 
@@ -298,10 +317,10 @@
         <div class="card-body">
           <h3 class="card-title">cargador iphone</h3>
           <div class="card-prices">
-            <span class="price">Q 70,000</span>
+            <span class="price">$ 70.000</span>
             
           </div>
-          <a class="buy" href="#producto-1074" data-id="1074">Ver producto</a>
+          <button class="buy" type="button" data-add="1074">Agregar al carrito</button>
         </div>
       </article>
 
@@ -310,10 +329,10 @@
         <div class="card-body">
           <h3 class="card-title">🔥PARLANTE BLUETOOTH🔥- A PRUEBA DE AGUA 💧</h3>
           <div class="card-prices">
-            <span class="price">Q 59,369</span>
-            <span class="compare">Q 99,900</span>
+            <span class="price">$ 59.369</span>
+            <span class="compare">$ 99.900</span>
           </div>
-          <a class="buy" href="#producto-875" data-id="875">Ver producto</a>
+          <button class="buy" type="button" data-add="875">Agregar al carrito</button>
         </div>
       </article>
 
@@ -322,10 +341,10 @@
         <div class="card-body">
           <h3 class="card-title">versión con cable de 5 metros</h3>
           <div class="card-prices">
-            <span class="price">Q 15,000</span>
+            <span class="price">$ 15.000</span>
             
           </div>
-          <a class="buy" href="#producto-873" data-id="873">Ver producto</a>
+          <button class="buy" type="button" data-add="873">Agregar al carrito</button>
         </div>
       </article>
 
@@ -334,10 +353,10 @@
         <div class="card-body">
           <h3 class="card-title">Toolblu® / METRO NIVEL 4 EN 1</h3>
           <div class="card-prices">
-            <span class="price">Q 76,000</span>
+            <span class="price">$ 76.000</span>
             
           </div>
-          <a class="buy" href="#producto-872" data-id="872">Ver producto</a>
+          <button class="buy" type="button" data-add="872">Agregar al carrito</button>
         </div>
       </article>
 
@@ -346,10 +365,10 @@
         <div class="card-body">
           <h3 class="card-title">Toolblu® / LLAVE UNIVERSAL</h3>
           <div class="card-prices">
-            <span class="price">Q 79,900</span>
-            <span class="compare">Q 109,900</span>
+            <span class="price">$ 79.900</span>
+            <span class="compare">$ 109.900</span>
           </div>
-          <a class="buy" href="#producto-871" data-id="871">Ver producto</a>
+          <button class="buy" type="button" data-add="871">Agregar al carrito</button>
         </div>
       </article>
 
@@ -358,10 +377,10 @@
         <div class="card-body">
           <h3 class="card-title">Toolblu® / LLAVE HEXAGONAL UNIVERSAL</h3>
           <div class="card-prices">
-            <span class="price">Q 64,900</span>
-            <span class="compare">Q 89,900</span>
+            <span class="price">$ 64.900</span>
+            <span class="compare">$ 89.900</span>
           </div>
-          <a class="buy" href="#producto-870" data-id="870">Ver producto</a>
+          <button class="buy" type="button" data-add="870">Agregar al carrito</button>
         </div>
       </article>
 
@@ -370,10 +389,10 @@
         <div class="card-body">
           <h3 class="card-title">Toolblu® / Extractor de tornillos 4 piezas</h3>
           <div class="card-prices">
-            <span class="price">Q 59,900</span>
+            <span class="price">$ 59.900</span>
             
           </div>
-          <a class="buy" href="#producto-869" data-id="869">Ver producto</a>
+          <button class="buy" type="button" data-add="869">Agregar al carrito</button>
         </div>
       </article>
 
@@ -382,10 +401,10 @@
         <div class="card-body">
           <h3 class="card-title">Tapón para puerta con aislamiento de Plagas , ruido y suciedad</h3>
           <div class="card-prices">
-            <span class="price">Q 63,369</span>
-            <span class="compare">Q 99,900</span>
+            <span class="price">$ 63.369</span>
+            <span class="compare">$ 99.900</span>
           </div>
-          <a class="buy" href="#producto-868" data-id="868">Ver producto</a>
+          <button class="buy" type="button" data-add="868">Agregar al carrito</button>
         </div>
       </article>
 
@@ -394,10 +413,10 @@
         <div class="card-body">
           <h3 class="card-title">Tabla de picar multifuncional</h3>
           <div class="card-prices">
-            <span class="price">Q 64,900</span>
-            <span class="compare">Q 99,900</span>
+            <span class="price">$ 64.900</span>
+            <span class="compare">$ 99.900</span>
           </div>
-          <a class="buy" href="#producto-867" data-id="867">Ver producto</a>
+          <button class="buy" type="button" data-add="867">Agregar al carrito</button>
         </div>
       </article>
 
@@ -406,10 +425,10 @@
         <div class="card-body">
           <h3 class="card-title">SET X6 TAPA ESLASTICA</h3>
           <div class="card-prices">
-            <span class="price">Q 47,900</span>
+            <span class="price">$ 47.900</span>
             
           </div>
-          <a class="buy" href="#producto-866" data-id="866">Ver producto</a>
+          <button class="buy" type="button" data-add="866">Agregar al carrito</button>
         </div>
       </article>
 
@@ -418,10 +437,10 @@
         <div class="card-body">
           <h3 class="card-title">set de artes de 145 piezas</h3>
           <div class="card-prices">
-            <span class="price">Q 140,000</span>
+            <span class="price">$ 140.000</span>
             
           </div>
-          <a class="buy" href="#producto-865" data-id="865">Ver producto</a>
+          <button class="buy" type="button" data-add="865">Agregar al carrito</button>
         </div>
       </article>
 
@@ -430,10 +449,10 @@
         <div class="card-body">
           <h3 class="card-title">Sellador Impermeabilizante</h3>
           <div class="card-prices">
-            <span class="price">Q 63,900</span>
-            <span class="compare">Q 89,900</span>
+            <span class="price">$ 63.900</span>
+            <span class="compare">$ 89.900</span>
           </div>
-          <a class="buy" href="#producto-864" data-id="864">Ver producto</a>
+          <button class="buy" type="button" data-add="864">Agregar al carrito</button>
         </div>
       </article>
 
@@ -442,10 +461,10 @@
         <div class="card-body">
           <h3 class="card-title">Riddex ultrasonico y 10 protectores de cañeria , anti insectos</h3>
           <div class="card-prices">
-            <span class="price">Q 69,900</span>
-            <span class="compare">Q 89,900</span>
+            <span class="price">$ 69.900</span>
+            <span class="compare">$ 89.900</span>
           </div>
-          <a class="buy" href="#producto-863" data-id="863">Ver producto</a>
+          <button class="buy" type="button" data-add="863">Agregar al carrito</button>
         </div>
       </article>
 
@@ -454,10 +473,10 @@
         <div class="card-body">
           <h3 class="card-title">Repuesto de filtro Purificador de agua</h3>
           <div class="card-prices">
-            <span class="price">Q 49,900</span>
+            <span class="price">$ 49.900</span>
             
           </div>
-          <a class="buy" href="#producto-862" data-id="862">Ver producto</a>
+          <button class="buy" type="button" data-add="862">Agregar al carrito</button>
         </div>
       </article>
 
@@ -466,10 +485,10 @@
         <div class="card-body">
           <h3 class="card-title">REJILLA DE PLATOS</h3>
           <div class="card-prices">
-            <span class="price">Q 59,369</span>
-            <span class="compare">Q 79,900</span>
+            <span class="price">$ 59.369</span>
+            <span class="compare">$ 79.900</span>
           </div>
-          <a class="buy" href="#producto-861" data-id="861">Ver producto</a>
+          <button class="buy" type="button" data-add="861">Agregar al carrito</button>
         </div>
       </article>
 
@@ -478,10 +497,10 @@
         <div class="card-body">
           <h3 class="card-title">Proyector navideño</h3>
           <div class="card-prices">
-            <span class="price">Q 89,900</span>
-            <span class="compare">Q 140,000</span>
+            <span class="price">$ 89.900</span>
+            <span class="compare">$ 140.000</span>
           </div>
-          <a class="buy" href="#producto-860" data-id="860">Ver producto</a>
+          <button class="buy" type="button" data-add="860">Agregar al carrito</button>
         </div>
       </article>
 
@@ -490,10 +509,10 @@
         <div class="card-body">
           <h3 class="card-title">PROTECTOR DE ESTUFA: SET X10</h3>
           <div class="card-prices">
-            <span class="price">Q 69,900</span>
+            <span class="price">$ 69.900</span>
             
           </div>
-          <a class="buy" href="#producto-859" data-id="859">Ver producto</a>
+          <button class="buy" type="button" data-add="859">Agregar al carrito</button>
         </div>
       </article>
 
@@ -502,10 +521,10 @@
         <div class="card-body">
           <h3 class="card-title">Pogo ball Saltarin</h3>
           <div class="card-prices">
-            <span class="price">Q 149,900</span>
-            <span class="compare">Q 220,000</span>
+            <span class="price">$ 149.900</span>
+            <span class="compare">$ 220.000</span>
           </div>
-          <a class="buy" href="#producto-858" data-id="858">Ver producto</a>
+          <button class="buy" type="button" data-add="858">Agregar al carrito</button>
         </div>
       </article>
 
@@ -514,16 +533,75 @@
         <div class="card-body">
           <h3 class="card-title">Par de Soporte de lavadora y nevera</h3>
           <div class="card-prices">
-            <span class="price">Q 89,900</span>
-            <span class="compare">Q 130,000</span>
+            <span class="price">$ 89.900</span>
+            <span class="compare">$ 130.000</span>
           </div>
-          <a class="buy" href="#producto-856" data-id="856">Ver producto</a>
+          <button class="buy" type="button" data-add="856">Agregar al carrito</button>
         </div>
       </article></section>
   </main>
   <footer class="ico">
     <div>Powered by iComfly Edge</div>
-    <div class="meta">Pagina horneada: 2026-06-03T20:57:24.371Z &middot; 40 productos &middot; Sin dependencia del backend para renderizar</div>
+    <div class="meta">Pagina horneada: 2026-06-03T21:05:07.327Z &middot; 40 productos &middot; Sin dependencia del backend para renderizar</div>
   </footer>
+
+  <button id="cartFab" class="cart-fab" type="button">🛒 Carrito <span id="cartCount" class="count">0</span></button>
+  <div id="drawerBg" class="drawer-bg"></div>
+  <aside id="drawer" class="drawer" aria-label="Carrito">
+    <h2>Tu carrito <button id="cartClose" class="close" type="button">&times;</button></h2>
+    <div id="cartItems" class="items"></div>
+    <div class="foot">
+      <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
+      <button id="cartCheckout" class="wa" type="button">Finalizar pedido por WhatsApp</button>
+    </div>
+  </aside>
+
+  <script>window.__STORE__={"name":"Joselevende","whatsapp":"573000000000","currency":"COP","symbol":"$","locale":"es-CO"};window.__PRODUCTS__={"856":{"name":"Par de Soporte de lavadora y nevera","price":89900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Copia_de_Copia_de_usando_homme_8.jpg?v=1727916763"},"858":{"name":"Pogo ball Saltarin","price":149900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Capturadepantalla2025-11-20ala_s_12.07.23a.m..jpg?v=1763615290"},"859":{"name":"PROTECTOR DE ESTUFA: SET X10","price":69900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/PROTECTOR-DE-ESTUFA-SET-X10-Joselevende-Colombia-988-ezgif.com-optiwebp.webp?v=1724883383"},"860":{"name":"Proyector navideño","price":89900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/3c9fc1c779d64880b46adb7f01cddf16_tplv-fhlh96nyum-resize-webp_800_800.webp?v=1763786488"},"861":{"name":"REJILLA DE PLATOS","price":59369,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/REJILLA-DE-PLATOS-Joselevende-Colombia-4379-ezgif.com-optiwebp.webp?v=1724883365"},"862":{"name":"Repuesto de filtro Purificador de agua","price":49900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/diseno-sin-titulo-_3__optimized_599d33ec-f508-4c60-9b96-4c6e1d167f1d.jpg?v=1724883363"},"863":{"name":"Riddex ultrasonico y 10 protectores de cañeria , anti insectos","price":69900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/1_db384f6a-0812-4193-8d7e-f686fc29a3f9.jpg?v=1770880924"},"864":{"name":"Sellador Impermeabilizante","price":63900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Sellador-Impermeabilizante-Joselevende-Colombia-5834-ezgif.com-optiwebp.webp?v=1724883362"},"865":{"name":"set de artes de 145 piezas","price":140000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/ezgif-7-dfb5be1a06.webp?v=1729137130"},"866":{"name":"SET X6 TAPA ESLASTICA","price":47900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/SET-X6-TAPA-ESLASTICA-Joselevende-Colombia-2253-ezgif.com-optiwebp.webp?v=1724883316"},"867":{"name":"Tabla de picar multifuncional","price":64900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Tabla-de-picar-multifuncional-Joselevende-Colombia-4293-ezgif.com-optiwebp.webp?v=1724883393"},"868":{"name":"Tapón para puerta con aislamiento de Plagas , ruido y suciedad","price":63369,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Tap-n-para-puerta-con-aislamiento-de-Plagas-ruido-y-suciedad-Joselevende-Colombia-8032-ezgif.com-optiwebp.webp?v=1724883403"},"869":{"name":"Toolblu® / Extractor de tornillos 4 piezas","price":59900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/ezgif-5-562a48bbd4.webp?v=1724899825"},"870":{"name":"Toolblu® / LLAVE HEXAGONAL UNIVERSAL","price":64900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/LLAVE-HEXAGONAL-UNIVERSAL-ENV-O-GR-TIS-Joselevende-Colombia-4549.jpg?v=1724881937"},"871":{"name":"Toolblu® / LLAVE UNIVERSAL","price":79900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/LLAVE-UNIVERSAL-ENV-O-GR-TIS-Joselevende-Colombia-2432-ezgif.com-optijpeg.jpg?v=1724883338"},"872":{"name":"Toolblu® / METRO NIVEL 4 EN 1","price":76000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/diseno-sin-titulo-_6__optimized.jpg?v=1724883352"},"873":{"name":"versión con cable de 5 metros","price":15000,"image":""},"875":{"name":"🔥PARLANTE BLUETOOTH🔥- A PRUEBA DE AGUA 💧","price":59369,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/PARLANTE-BLUETOOTH-A-PRUEBA-DE-AGUA-Joselevende-Colombia-4158-ezgif.com-optiwebp.webp?v=1724883386"},"1074":{"name":"cargador iphone","price":70000,"image":"https://pub-90121d4d6ea24fdf8034d8157e6f08d0.r2.dev/products/joselevende-p1-1774215819463-4y5b4aow0qh.webp"},"1075":{"name":"gel en jeringa anti cucarachas","price":59900,"image":"https://pub-90121d4d6ea24fdf8034d8157e6f08d0.r2.dev/products/joselevende-gemini-generated-image-qp70szqp70szqp70-1774285950607-d455s4metap.webp"},"1088":{"name":"cargador tipo c","price":70000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/WhatsAppImage2026-01-10at11.40.30AM.jpg?v=1774216331"},"1091":{"name":"Acaba con las cucarachas , jeringa + 10 protectores de drenaje gratis","price":59900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Gemini_Generated_Image_qp70szqp70szqp70.png?v=1775085786"},"1093":{"name":"zapato","price":360000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/download_d3bd2900-6de3-4eff-b9ff-4d65ce93d0b4.jpg?v=1775697092"},"1125":{"name":"Dobladora de tubos huth americana con todo el juego de dados 3, 3.5 , 4 y 5 pulgadas","price":55000000,"image":"https://pub-90121d4d6ea24fdf8034d8157e6f08d0.r2.dev/products/joselevende-whatsapp-image-2026-04-10-at-7-34-40-pm-1775953447154-t2lho87cq5o.webp"},"1294":{"name":"Adaptador de disco para taladro","price":58900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/1.webp?v=1776057317"},"1295":{"name":"Restaura tu cuero con el Adhesivo de cuero sintetico 50 x 137cm","price":69900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/1740450454WhatsAppImage2025-02-07at10.37.47-1775971010375-bm6zgw.webp?v=1775971450"},"1300":{"name":"Adaptador de prueba","price":20000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/1.webp?v=1776057317"},"1308":{"name":"Reflector Solar 3 Cabezales 5 metros cable","price":129900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/fnmhneaix2oypnsvnmn0.webp?v=1740664588"},"1316":{"name":"placas repara bisagras","price":8124,"image":""},"1319":{"name":"Reflector","price":129900,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/fnmhneaix2oypnsvnmn0.webp?v=1740664588"},"1320":{"name":"X4 bisagras cierre lento","price":38400,"image":""},"1623":{"name":"Pastillas 60 capsulas ","price":100000,"image":"https://pub-90121d4d6ea24fdf8034d8157e6f08d0.r2.dev/products/joselevende-copia-de-copia-de-copia-de-disen-o-sin-ti-tulo-vi--1776998269157-h3yf9d4yhbe.webp"},"1624":{"name":"pastillas 60 capsulas","price":0,"image":""},"3255":{"name":"Báscula Digital Inteligente Bluetooth – Mide Grasa, Músculo y Peso desde tu Celular","price":89800,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/1-1777996567894-8i2c46.webp?v=1777997426"},"3304":{"name":"Esterilizador Cepillo Dental Organizador Moderno Y Seguro","price":73600,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/D_NQ_NP_2X_608085-MLA94708930960_102025-F.webp?v=1778343849"},"3429":{"name":"Sarten Antiadherente Negra 4 Puestos Ideal Para Huevos Panqueques Y Arepa","price":87300,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Sarten4puestos_3.webp?v=1778852544"},"3430":{"name":"Organizador Zapatero Metálico Shoe Rack 6 Niveles","price":82400,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/Organizadordezapataos6niveles_6.webp?v=1778854212"},"3431":{"name":"Cobija Mágica Manta Térmica Brilla En Oscuridad","price":105400,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/CobijaMagica_4.webp?v=1778854752"},"3432":{"name":"Closet Armario Portátil Grande Organizador De Ropa","price":145800,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/ArmarioCloset3espacios_1.webp?v=1778855094"},"3579":{"name":"zapato (Copia)","price":360000,"image":"https://cdn.shopify.com/s/files/1/0614/6319/9904/files/download_d3bd2900-6de3-4eff-b9ff-4d65ce93d0b4.jpg?v=1775697092"}};</script>
+  <script>(function(){
+  var KEY='ico_cart_v1';
+  var S=window.__STORE__||{}; var P=window.__PRODUCTS__||{};
+  var bg=document.getElementById("drawerBg"), dr=document.getElementById("drawer");
+  function map(id){return P[id]||{name:"Producto",price:0,image:""};}
+  function fmt(n){try{return new Intl.NumberFormat(S.locale||"es-CO",{style:"currency",currency:S.currency||"COP",maximumFractionDigits:0}).format(n);}catch(e){return (S.symbol||"$")+Math.round(n).toLocaleString("es-CO");}}
+  function get(){try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};}}
+  function save(c){localStorage.setItem(KEY,JSON.stringify(c));render();}
+  function add(id){var c=get();c[id]=(c[id]||0)+1;save(c);open();}
+  function setQ(id,q){var c=get();if(q<=0){delete c[id];}else{c[id]=q;}save(c);}
+  function count(){var c=get(),n=0;for(var k in c){n+=c[k];}return n;}
+  function total(){var c=get(),t=0;for(var k in c){t+=map(k).price*c[k];}return t;}
+  function open(){bg.classList.add("open");dr.classList.add("open");}
+  function close(){bg.classList.remove("open");dr.classList.remove("open");}
+  function render(){
+    var fab=document.getElementById("cartCount"); if(fab){fab.textContent=count();}
+    var items=document.getElementById("cartItems"); var c=get(); var keys=Object.keys(c);
+    if(!items)return;
+    if(keys.length===0){items.innerHTML="<div class=\"cart-empty\">Tu carrito esta vacio</div>";}
+    else{var html="";for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];
+      html+="<div class=\"ci\"><img src=\""+(p.image||"")+"\" alt=\"\"><div class=\"info\"><div>"+p.name+"</div><div>"+fmt(p.price)+"</div>"
+        +"<div class=\"qty\"><button data-dec=\""+id+"\">-</button><span>"+q+"</span><button data-inc=\""+id+"\">+</button><button data-rm=\""+id+"\" style=\"margin-left:auto\">x</button></div></div></div>";}
+      items.innerHTML=html;}
+    var tot=document.getElementById("cartTotal"); if(tot){tot.textContent=fmt(total());}
+  }
+  function checkout(){
+    var c=get(),keys=Object.keys(c); if(keys.length===0){return;}
+    var msg="Hola "+(S.name||"")+", quiero pedir:\n";
+    for(var i=0;i<keys.length;i++){var p=map(keys[i]);msg+="- "+p.name+" x"+c[keys[i]]+" ("+fmt(p.price)+")\n";}
+    msg+="Total: "+fmt(total());
+    var wa=(S.whatsapp||"").replace(/[^0-9]/g,"");
+    var url = wa ? ("https://wa.me/"+wa+"?text="+encodeURIComponent(msg)) : ("https://wa.me/?text="+encodeURIComponent(msg));
+    window.open(url,"_blank");
+  }
+  document.addEventListener("click",function(e){
+    var t=e.target;
+    if(t.dataset.add){add(t.dataset.add);}
+    else if(t.dataset.inc){setQ(t.dataset.inc,(get()[t.dataset.inc]||0)+1);}
+    else if(t.dataset.dec){setQ(t.dataset.dec,(get()[t.dataset.dec]||0)-1);}
+    else if(t.dataset.rm){setQ(t.dataset.rm,0);}
+    else if(t.id==="cartFab"){open();}
+    else if(t.id==="drawerBg"||t.id==="cartClose"){close();}
+    else if(t.id==="cartCheckout"){checkout();}
+  });
+  render();
+})();</script>
 </body>
 </html>
