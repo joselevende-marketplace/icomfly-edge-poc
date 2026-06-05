@@ -20,6 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createHash } from 'node:crypto';
 
 const exec = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,22 @@ h1{font-size:1.4rem}ul{line-height:2.2;list-style:none;padding:0}a{color:#108EE3
 <ul>${links}</ul>
 <div class="note">Banco de pruebas de velocidad (Fase 0-2). Cada tienda es HTML estatico servido desde el edge, sin depender del backend de iComfly para mostrarse.</div>
 </body></html>`;
+}
+
+// SHA-256 del contenido horneado de todas las tiendas, normalizando (quitando)
+// el timestamp "Pagina horneada: <fecha>" que cambia en cada horneado. Si dos
+// horneados dan el mismo hash, el contenido real es identico -> no redesplegar.
+async function contentHash(stores) {
+  const h = createHash('sha256');
+  for (const s of stores) {
+    const sub = subdomainOf(s);
+    try {
+      let html = await readFile(join(DIST, sub, 'index.html'), 'utf8');
+      html = html.replace(/(Pagina horneada: )[^&]*/i, '$1');
+      h.update(sub + '\n' + html + '\n');
+    } catch { /* tienda sin index: se ignora en el hash */ }
+  }
+  return h.digest('hex');
 }
 
 async function git(args) {
@@ -129,6 +146,12 @@ async function main() {
   await writeFile(join(DIST, 'index.html'), indexHtml(stores), 'utf8');
   await writeFile(join(DIST, '.nojekyll'), '', 'utf8');
   log('Indice raiz generado.');
+
+  // Huella del contenido horneado (excluye el timestamp volatil "Pagina horneada")
+  // para que el workflow solo redespliegue a Cloudflare cuando algo cambio de
+  // verdad, y no queme la cuota de 500 deploys/mes con redeploys identicos.
+  await writeFile(join(DIST, 'content-hash.txt'), (await contentHash(stores)) + '\n', 'utf8');
+  log('Huella de contenido generada (content-hash.txt).');
 
   if (DEPLOY) {
     await deploy();

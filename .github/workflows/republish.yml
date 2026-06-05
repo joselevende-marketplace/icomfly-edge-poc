@@ -1,10 +1,10 @@
 name: Republicar storefronts al edge (Cloudflare)
 
 # Cada ~10 min (y a demanda) re-hornea las tiendas con pagina web ACTIVA leyendo
-# la API publica de iComfly (/public/stores-to-bake) y republica al edge de
-# Cloudflare Pages (proyecto icomfly-storefronts). Cuando una tienda cambia su
-# diseno, sus productos o su subdominio en el panel, su pagina se actualiza SOLA,
-# sin que nadie toque nada.
+# la API publica de iComfly (/public/stores-to-bake) y, SOLO si el contenido
+# cambio de verdad, republica al edge de Cloudflare Pages (icomfly-storefronts).
+# La deteccion de cambios (content-hash.txt) evita quemar la cuota de 500
+# deploys/mes con redeploys identicos.
 
 on:
   schedule:
@@ -28,9 +28,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Hornear tiendas (lee API publica de iComfly)
         run: node publish.mjs
+
+      - name: Detectar si el contenido cambio vs lo ya publicado
+        id: changes
+        run: |
+          NEW=$(cat dist/content-hash.txt 2>/dev/null || echo "nuevo")
+          OLD=$(curl -s -m 20 https://icomfly-storefronts.pages.dev/content-hash.txt | head -c 100 || echo "")
+          echo "nuevo=$NEW"
+          echo "live=$OLD"
+          if [ "$NEW" = "$OLD" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ Sin cambios reales; no se redespliega (ahorra cuota)."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "📦 Cambios detectados; se redespliega a Cloudflare."
+          fi
+
       - name: Publicar dist/ a Cloudflare Pages
+        if: steps.changes.outputs.changed == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
