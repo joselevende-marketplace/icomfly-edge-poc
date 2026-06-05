@@ -10,6 +10,8 @@ on:
   schedule:
     - cron: '*/10 * * * *'   # GitHub puede demorar el cron unos minutos
   workflow_dispatch:          # boton "Run workflow" manual
+  repository_dispatch:        # aviso instantaneo del backend al guardar la tienda
+    types: [store-published]
   push:
     branches: [ main ]        # republica al cambiar los scripts
 
