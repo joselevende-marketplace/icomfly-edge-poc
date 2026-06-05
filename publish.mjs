@@ -30,27 +30,35 @@ function log(m) {
   console.log(`[publish] ${m}`);
 }
 
+// El subdominio (carpeta de salida / ruta del Worker) puede diferir del slug
+// real de la tienda. Si la tienda no eligio subdominio, cae a su slug.
+function subdomainOf(s) {
+  return (s.subdomain || s.slug || '').trim();
+}
+
 async function bakeStore(s) {
   const env = { ...process.env };
   if (s.store_id) env.STORE_ID = String(s.store_id);
+  if (s.slug) env.CONFIG_SLUG = s.slug;            // slug REAL para leer config/tema
   if (s.currency) env.CURRENCY = s.currency;
   if (s.currency_symbol) env.CURRENCY_SYMBOL = s.currency_symbol;
   if (s.currency_locale) env.CURRENCY_LOCALE = s.currency_locale;
   if (s.whatsapp) env.WHATSAPP = s.whatsapp;
   if (s.store_name) env.STORE_NAME = s.store_name;
 
-  const { stdout } = await exec('node', ['bake.mjs', s.slug], { cwd: __dirname, env });
+  const sub = subdomainOf(s);
+  const { stdout } = await exec('node', ['bake.mjs', sub], { cwd: __dirname, env });
   // Mostrar solo la linea LISTO de cada bake
   const done = stdout.split('\n').find((l) => l.includes('LISTO')) || '(horneado)';
-  log(`  ${s.slug}: ${done.replace('[bake] ', '')}`);
+  log(`  ${sub}: ${done.replace('[bake] ', '')}`);
 }
 
 function indexHtml(stores) {
   const links = stores
-    .map(
-      (s) =>
-        `<li><a href="./${s.slug}/">${s.store_name || s.slug}</a> <span class="muted">/${s.slug}/</span></li>`
-    )
+    .map((s) => {
+      const sub = subdomainOf(s);
+      return `<li><a href="./${sub}/">${s.store_name || sub}</a> <span class="muted">/${sub}/</span></li>`;
+    })
     .join('\n');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -88,9 +96,28 @@ async function deploy() {
   log('  push OK -> el CDN se actualiza en ~1 min');
 }
 
+// Lista de tiendas a hornear: las que tienen pagina web ACTIVA, segun el backend.
+// Cae a stores.json si el endpoint no responde (para no romper el horneado).
+async function loadStores() {
+  const API_BASE = process.env.API_BASE || 'https://api.icomfly.com/api';
+  try {
+    const res = await fetch(`${API_BASE}/public/stores-to-bake`, {
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const stores = Array.isArray(data) ? data : data.stores || [];
+    log(`Tiendas con web activa (API): ${stores.length}`);
+    return stores;
+  } catch (e) {
+    log(`API /public/stores-to-bake fallo (${e.message}); uso stores.json`);
+    const cfg = JSON.parse(await readFile(join(__dirname, 'stores.json'), 'utf8'));
+    return cfg.stores || [];
+  }
+}
+
 async function main() {
-  const cfg = JSON.parse(await readFile(join(__dirname, 'stores.json'), 'utf8'));
-  const stores = cfg.stores || [];
+  const stores = await loadStores();
   log(`Tiendas a hornear: ${stores.length}`);
 
   await mkdir(DIST, { recursive: true });
