@@ -58,6 +58,19 @@ function cdnImage(src, w = 440, q = 75) {
   return `https://myicomfly.com/cdn-cgi/image/width=${w},quality=${q},format=auto,fit=cover/${src}`;
 }
 
+// Optimiza las imagenes DENTRO del web_page_html (la pagina personalizada del
+// editor): reescribe URLs raster de Shopify/R2 a su version Cloudflare. Aqui esta
+// el grueso del peso de la pagina (hero + secciones), que antes iba sin optimizar.
+// No toca SVGs ni otros origenes, ni envuelve dos veces. Gated por IMAGE_CDN.
+function optimizeHtmlImages(html) {
+  if (!IMAGE_CDN_ENABLED || typeof html !== 'string') return html;
+  return html.replace(/https?:\/\/(?:cdn\.shopify\.com|pub-[a-z0-9]+\.r2\.dev)\/[^\s"')]+/gi, (url) => {
+    if (url.includes('/cdn-cgi/')) return url;               // ya optimizada
+    if (!/\.(?:jpe?g|png|webp)(?:$|\?)/i.test(url)) return url; // solo raster
+    return `https://myicomfly.com/cdn-cgi/image/width=1000,quality=75,format=auto/${url}`;
+  });
+}
+
 // --- Render de una tarjeta de producto ---
 
 function renderProductCard(product, store) {
@@ -206,7 +219,7 @@ export function renderStorePage({ store, products, bakedAt }) {
   const title = store.name || 'Tienda';
   const list = products || [];
   const cards = list.map((p) => renderProductCard(p, store)).join('\n');
-  const customHtml = (store.web_page_html || '').trim();
+  const customHtml = optimizeHtmlImages((store.web_page_html || '').trim());
 
   const grid = list.length
     ? `<section class="grid">${cards}</section>`
