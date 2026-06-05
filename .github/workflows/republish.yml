@@ -31,6 +31,8 @@ jobs:
 
       - name: Hornear tiendas (lee API publica de iComfly)
         run: node publish.mjs
+        env:
+          IMAGE_CDN: '1'   # imagenes via Cloudflare /cdn-cgi/image (Transformations habilitado)
 
       - name: Detectar si el contenido cambio vs lo ya publicado
         id: changes
