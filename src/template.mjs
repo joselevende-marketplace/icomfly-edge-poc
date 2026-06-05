@@ -43,6 +43,21 @@ function firstImage(product) {
   return imgs.find((u) => typeof u === 'string' && u.startsWith('http')) || '';
 }
 
+// Optimizacion de imagenes via Cloudflare Image Transformations: reescribe la URL
+// a su version redimensionada/comprimida servida por la zona myicomfly.com
+// (/cdn-cgi/image/). Requiere habilitar Transformations en el dashboard + permitir
+// los origenes externos (Shopify CDN / R2). Si no esta habilitado o falla, el <img>
+// hace fallback a la URL original via onerror (ver renderProductCard).
+//
+// INTERRUPTOR: solo se activa con IMAGE_CDN=1 en el entorno del horneado. Apagado
+// (default) devuelve la URL original -> cero regresion si Transformations aun no
+// esta habilitado en Cloudflare (evita una peticion fallida + fallback por imagen).
+const IMAGE_CDN_ENABLED = process.env.IMAGE_CDN === '1';
+function cdnImage(src, w = 440, q = 75) {
+  if (!IMAGE_CDN_ENABLED || typeof src !== 'string' || !/^https?:\/\//i.test(src)) return src;
+  return `https://myicomfly.com/cdn-cgi/image/width=${w},quality=${q},format=auto,fit=cover/${src}`;
+}
+
 // --- Render de una tarjeta de producto ---
 
 function renderProductCard(product, store) {
@@ -61,7 +76,7 @@ function renderProductCard(product, store) {
   }
 
   const imgTag = img
-    ? `<img src="${esc(img)}" alt="${esc(product.name)}" loading="lazy" decoding="async" width="400" height="400">`
+    ? `<img src="${esc(cdnImage(img))}" alt="${esc(product.name)}" loading="lazy" decoding="async" width="400" height="400" onerror="this.onerror=null;this.src='${esc(img)}'">`
     : `<div class="noimg">Sin imagen</div>`;
 
   return `
@@ -197,6 +212,25 @@ export function renderStorePage({ store, products, bakedAt }) {
     ? `<section class="grid">${cards}</section>`
     : `<div class="empty">Esta tienda aun no tiene productos publicados.</div>`;
 
+  // El web_page_html del editor trae el marcador <!--WB_CATALOG--> donde debe ir
+  // el catalogo (igual que el storefront real de icomfly.com). Si existe, partimos
+  // el HTML e insertamos la grilla ahi; si no, va al final. La pagina publicada
+  // trae su propio diseno completo, asi que NO ponemos el hero/footer genericos.
+  const MARKER = '<!--WB_CATALOG-->';
+  let mainContent;
+  if (customHtml && customHtml.includes(MARKER)) {
+    const parts = customHtml.split(MARKER);
+    mainContent = parts[0] + grid + parts.slice(1).join('');
+  } else if (customHtml) {
+    mainContent = customHtml + '\n' + grid;
+  } else {
+    mainContent = grid;
+  }
+  // Hero generico SOLO cuando la tienda no publico su propia pagina (fallback).
+  const heroHtml = customHtml
+    ? ''
+    : `<header class="hero"><h1>${esc(title)}</h1>${store.description ? `<p>${esc(store.description)}</p>` : ''}</header>`;
+
   // Datos minimos para el carrito (id -> {name, price, image}) y la tienda.
   const productMap = {};
   for (const p of list) {
@@ -227,18 +261,12 @@ export function renderStorePage({ store, products, bakedAt }) {
   <style>${criticalCss(theme)}</style>
 </head>
 <body>
-  <header class="hero">
-    <h1>${esc(title)}</h1>
-    ${store.description ? `<p>${esc(store.description)}</p>` : ''}
-  </header>
+  ${heroHtml}
   <main>
-    ${customHtml ? `<section class="custom-html">${customHtml}</section>` : ''}
-    ${grid}
+    ${mainContent}
   </main>
-  <footer class="ico">
-    <div>Powered by iComfly Edge</div>
-    <div class="meta">Pagina horneada: ${esc(bakedAt)} &middot; ${list.length} productos &middot; Sin dependencia del backend para renderizar</div>
-  </footer>
+  <!-- baked: ${esc(bakedAt)} | ${list.length} productos -->
+
 
   <button id="cartFab" class="cart-fab" type="button">🛒 Carrito <span id="cartCount" class="count">0</span></button>
   <div id="drawerBg" class="drawer-bg"></div>
