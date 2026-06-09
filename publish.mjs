@@ -54,6 +54,23 @@ async function bakeStore(s) {
   log(`  ${sub}: ${done.replace('[bake] ', '')}`);
 }
 
+// Origen en vivo del CDN (Cloudflare Pages). Se usa para PRESERVAR la pagina ya
+// publicada de una tienda cuyo horneado FALLO este run, y NO sacarla del edge por
+// un fallo transitorio (el deploy de Pages reemplaza todo el dist/).
+const PAGES_ORIGIN = process.env.PAGES_ORIGIN || 'https://icomfly-storefronts.pages.dev';
+
+async function preserveLive(sub) {
+  const idx = await fetch(`${PAGES_ORIGIN}/${sub}/index.html`);
+  if (!idx.ok) throw new Error(`sin pagina en vivo (${idx.status})`);
+  await mkdir(join(DIST, sub), { recursive: true });
+  await writeFile(join(DIST, sub, 'index.html'), await idx.text(), 'utf8');
+  // meta.json es lo que el Worker usa para validar que la tienda existe; preservarlo.
+  const meta = await fetch(`${PAGES_ORIGIN}/${sub}/meta.json`);
+  if (meta.ok && (meta.headers.get('content-type') || '').includes('json')) {
+    await writeFile(join(DIST, sub, 'meta.json'), await meta.text(), 'utf8');
+  }
+}
+
 function indexHtml(stores) {
   const links = stores
     .map((s) => {
@@ -138,8 +155,28 @@ async function main() {
   log(`Tiendas a hornear: ${stores.length}`);
 
   await mkdir(DIST, { recursive: true });
+  // AISLAMIENTO POR TIENDA: un fallo en UNA tienda NO debe tumbar el horneado de las
+  // demas (clave para 121 tiendas). Se captura por tienda; si una falla, se PRESERVA
+  // su pagina ya publicada (re-bajandola del edge) para no sacarla por un fallo
+  // transitorio. Las demas continuan normalmente.
+  const failures = [];
   for (const s of stores) {
-    await bakeStore(s);
+    const sub = subdomainOf(s);
+    try {
+      await bakeStore(s);
+    } catch (e) {
+      failures.push(sub);
+      log(`  ⚠️ FALLO ${sub}: ${e.message}`);
+      try {
+        await preserveLive(sub);
+        log(`     preservada la pagina actual de ${sub} (no se saca del edge)`);
+      } catch (pe) {
+        log(`     no se pudo preservar ${sub} (${pe.message}); quedara ausente este deploy`);
+      }
+    }
+  }
+  if (failures.length) {
+    log(`⚠️ ${failures.length}/${stores.length} tienda(s) fallaron al hornear: ${failures.join(', ')}. Las demas continuaron.`);
   }
 
   // Indice raiz
