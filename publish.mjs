@@ -15,7 +15,7 @@
  * El deploy usa el repo git que vive en dist/ (remote origin = repo demo).
  */
 
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -91,18 +91,34 @@ h1{font-size:1.4rem}ul{line-height:2.2;list-style:none;padding:0}a{color:#108EE3
 </body></html>`;
 }
 
-// SHA-256 del contenido horneado de todas las tiendas, normalizando (quitando)
-// el timestamp "Pagina horneada: <fecha>" que cambia en cada horneado. Si dos
+// SHA-256 del contenido horneado de todas las tiendas (portada + fichas de
+// producto), normalizando los timestamps que cambian en cada horneado
+// ("Pagina horneada: <fecha>" y "<!-- baked: <fecha> ... -->"). Si dos
 // horneados dan el mismo hash, el contenido real es identico -> no redesplegar.
+function normalizeBaked(html) {
+  return html
+    .replace(/(Pagina horneada: )[^&]*/i, '$1')
+    .replace(/<!-- baked: [^>]*-->/gi, '<!-- baked -->');
+}
+
 async function contentHash(stores) {
   const h = createHash('sha256');
   for (const s of stores) {
     const sub = subdomainOf(s);
     try {
-      let html = await readFile(join(DIST, sub, 'index.html'), 'utf8');
-      html = html.replace(/(Pagina horneada: )[^&]*/i, '$1');
-      h.update(sub + '\n' + html + '\n');
+      const html = await readFile(join(DIST, sub, 'index.html'), 'utf8');
+      h.update(sub + '\n' + normalizeBaked(html) + '\n');
     } catch { /* tienda sin index: se ignora en el hash */ }
+    // Fichas de producto (dist/<sub>/producto/<id>/index.html), en orden estable.
+    try {
+      const ids = (await readdir(join(DIST, sub, 'producto'))).sort();
+      for (const id of ids) {
+        try {
+          const ph = await readFile(join(DIST, sub, 'producto', id, 'index.html'), 'utf8');
+          h.update(`${sub}/producto/${id}\n` + normalizeBaked(ph) + '\n');
+        } catch { /* ficha ilegible: se ignora en el hash */ }
+      }
+    } catch { /* tienda sin fichas */ }
   }
   return h.digest('hex');
 }

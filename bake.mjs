@@ -17,7 +17,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderStorePage } from './src/template.mjs';
+import { renderStorePage, renderProductPage } from './src/template.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -127,6 +127,25 @@ async function main() {
     ),
     'utf8'
   );
+
+  // 6. Hornear la FICHA de cada producto -> dist/<slug>/producto/<id>/index.html
+  //    (el Worker comodin ya reenvia subrutas, asi que tienda.com/producto/<id>/
+  //    sirve esta pagina sin tocar el Worker). Un fallo en UNA ficha no tumba
+  //    el horneado de la tienda.
+  let productPages = 0;
+  for (const p of (Array.isArray(products) ? products : [])) {
+    if (!p || p.id == null) continue;
+    try {
+      const pHtml = renderProductPage({ store, product: p, products, bakedAt });
+      const pDir = join(outDir, 'producto', String(p.id));
+      await mkdir(pDir, { recursive: true });
+      await writeFile(join(pDir, 'index.html'), pHtml, 'utf8');
+      productPages++;
+    } catch (e) {
+      log(`  ⚠️ ficha del producto ${p.id} fallo: ${e.message}`);
+    }
+  }
+  log(`Fichas de producto horneadas: ${productPages}`);
 
   log(`LISTO -> ${outFile}`);
   log(`Tamano HTML: ${(Buffer.byteLength(html, 'utf8') / 1024).toFixed(1)} KB`);
