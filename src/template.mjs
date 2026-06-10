@@ -199,6 +199,30 @@ function criticalCss(theme) {
     .co input.bad{border-color:#e11d48}
     .co-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:10px}
     .co-submit{margin-top:2px}
+    /* Selector de unidades (ofertas de cantidad) */
+    .offs{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+    .off{display:flex;align-items:center;gap:10px;border:1.5px solid #e2e7f0;border-radius:12px;padding:9px 12px;cursor:pointer;background:#fff}
+    .off.on{border-color:var(--primary);background:#f4f9ff;box-shadow:0 0 0 1px var(--primary)}
+    .off img{width:44px;height:44px;object-fit:cover;border-radius:8px;background:#eef1f5;flex:0 0 auto}
+    .off-mid{flex:1;min-width:0}
+    .off-t{font-weight:800;font-size:.95rem}
+    .off-b{display:inline-block;margin-top:3px;background:#22c55e;color:#fff;font-weight:700;font-size:.72rem;padding:2px 8px;border-radius:6px}
+    .off-p{text-align:right;font-size:.95rem}
+    .off-p s{display:block;color:var(--muted);font-size:.78rem}
+    .off-p b{font-weight:800}
+    /* Envio + totales */
+    .shiprow{display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e7f0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:.92rem;margin-bottom:12px}
+    .totrows{border:1px solid #e2e7f0;border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:.92rem}
+    .totrows>div{display:flex;justify-content:space-between;padding:4px 0}
+    .totrows .tt{border-top:1px solid #e9edf3;margin-top:4px;padding-top:8px;font-weight:800}
+    .freegreen{color:#16a34a;font-weight:700}
+    .co-head{text-align:center;font-weight:800;font-size:1.02rem;margin:2px 0 12px}
+    .co label i{color:#e11d48;font-style:normal}
+    .co select{width:100%;padding:11px 12px;border:1px solid #d8dee8;border-radius:10px;margin:4px 0 12px;font-size:.95rem;font-family:inherit;background:#fff}
+    .co select.bad{border-color:#e11d48}
+    .finish{display:block;width:100%;border:0;cursor:pointer;background:#22c55e;color:#06250f;font-weight:800;padding:14px;border-radius:12px;font-size:.98rem}
+    .finish:hover{filter:brightness(.96)}
+    .finish:disabled{opacity:.6;cursor:wait}
     /* Resumen del producto arriba del formulario (compra directa) */
     .co-sum{display:flex;gap:12px;align-items:center;background:#f4f6fa;border:1px solid #e4e8f0;border-radius:12px;padding:10px 12px;margin-bottom:14px}
     .co-sum img{width:54px;height:54px;object-fit:cover;border-radius:9px;background:#e8ecf3;flex:0 0 auto}
@@ -244,91 +268,93 @@ function criticalCss(theme) {
 function hydrationScript() {
   return [
     '(function(){',
-    "  var KEY='ico_cart_v1';",
     '  var S=window.__STORE__||{}; var P=window.__PRODUCTS__||{};',
     '  var bg=document.getElementById("drawerBg"), dr=document.getElementById("drawer");',
-    '  function map(id){return P[id]||{name:"Producto",price:0,image:""};}',
-    // Escapa HTML antes de concatenar a innerHTML: sin esto, un nombre/imagen de
-    // producto con markup (o un localStorage manipulado) ejecutaria JS (DOM XSS).
+    '  function map(id){return P[id]||{name:"Producto",price:0,image:"",offers:[]};}',
+    // Escapa HTML antes de concatenar a innerHTML (DOM XSS).
     '  function eh(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}',
     '  function fmt(n){try{return new Intl.NumberFormat(S.locale||"es-CO",{style:"currency",currency:S.currency||"COP",maximumFractionDigits:0}).format(n);}catch(e){return (S.symbol||"$")+Math.round(n).toLocaleString("es-CO");}}',
-    '  function get(){try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};}}',
-    '  function save(c){localStorage.setItem(KEY,JSON.stringify(c));render();}',
-    '  function total(){var c=get(),t=0;for(var k in c){t+=map(k).price*c[k];}return t;}',
     '  var API="https://api.icomfly.com/api";',
     '  function view(name){',
     '    var ids=["coView","doneView"];',
     '    for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el){el.style.display=(ids[i]===name)?"":"none";}}',
     '  }',
     '  function close(){bg.classList.remove("open");dr.classList.remove("open");}',
-    '  function render(){',
-    '    var fab=document.getElementById("cartCount"); if(fab){fab.textContent=count();}',
-    '    var items=document.getElementById("cartItems"); var c=get(); var keys=Object.keys(c);',
-    '    if(!items)return;',
-    '    if(keys.length===0){items.innerHTML="<div class=\\"cart-empty\\">Tu carrito esta vacio</div>";}',
-    '    else{var html="";for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];',
-    '      html+="<div class=\\"ci\\"><img src=\\""+eh(p.image||"")+"\\" alt=\\"\\"><div class=\\"info\\"><div>"+eh(p.name)+"</div><div>"+fmt(p.price)+"</div>"',
-    '        +"<div class=\\"qty\\"><button data-dec=\\""+id+"\\">-</button><span>"+q+"</span><button data-inc=\\""+id+"\\">+</button><button data-rm=\\""+id+"\\" style=\\"margin-left:auto\\">x</button></div></div></div>";}',
-    '      items.innerHTML=html;}',
-    '    var tot=document.getElementById("cartTotal"); if(tot){tot.textContent=fmt(total());}',
+    // PEDIDO DIRECTO con OFERTAS DE CANTIDAD (mismo funnel que la SPA):
+    // OPTS[0] = 1 unidad a precio base; el resto vienen de quantity_offers del
+    // producto (descuento % sobre el unitario). SEL.i = opcion elegida.
+    '  var OPTS=[];var SEL={id:null,i:0};',
+    '  function curOpt(){return OPTS[SEL.i]||OPTS[0];}',
+    '  function unitPrice(base,d){return Math.round(base*(100-d)/100);}',
+    '  function updateTotals(){',
+    '    var p=map(SEL.id);var o=curOpt();var tot=unitPrice(p.price,o.d)*o.q;',
+    '    var sub=document.getElementById("tSub");if(sub){sub.textContent=fmt(tot);}',
+    '    var t=document.getElementById("tTot");if(t){t.textContent=fmt(tot);}',
+    '    var b=document.getElementById("coSubmit");if(b&&!b.disabled){b.textContent="Finaliza Tu Pedido Contra Entrega - "+fmt(tot);}',
     '  }',
-    // COMPRA DIRECTA (sin carrito): "Comprar" arma el pedido con ESTE producto
-    // y abre el drawer directo en el FORMULARIO, con su resumen arriba. El POST
-    // /api/orders crea la orden real (el backend deduce el store del producto).
+    '  function renderOffers(){',
+    '    var p=map(SEL.id);var box=document.getElementById("coOffers");if(!box){return;}',
+    '    var img=eh(p.image||"");var html="";',
+    '    for(var i=0;i<OPTS.length;i++){var o=OPTS[i];var tot=unitPrice(p.price,o.d)*o.q;var strike=o.d?fmt(p.price*o.q):"";',
+    '      html+="<div class=\\"off"+(i===SEL.i?" on":"")+"\\" data-off=\\""+i+"\\">"',
+    '        +"<img src=\\""+img+"\\" alt=\\"\\">"',
+    '        +"<div class=\\"off-mid\\"><div class=\\"off-t\\">"+eh(o.t)+"</div>"+(o.d?"<div class=\\"off-b\\">Ahorra "+o.d+"% adicional</div>":"")+"</div>"',
+    '        +"<div class=\\"off-p\\">"+(strike?"<s>"+strike+"</s>":"")+"<b>"+fmt(tot)+"</b></div></div>";}',
+    '    box.innerHTML=html;updateTotals();',
+    '  }',
+    // "Comprar": abre el drawer DIRECTO en el formulario con este producto.
     '  function buyNow(id){',
-    '    var c={};c[id]=1;save(c);',
-    '    var p=map(id);var sm=document.getElementById("coSummary");',
-    '    if(sm){sm.innerHTML="<img src=\\""+eh(p.image||"")+"\\" alt=\\"\\"><div><div class=\\"co-sum-name\\">"+eh(p.name)+"</div><div class=\\"co-sum-price\\">"+fmt(p.price)+" &middot; pago contra entrega</div></div>";}',
-    '    var err=document.getElementById("coError"); if(err){err.style.display="none";}',
+    '    var p=map(id);if(!p||!p.price){return;}',
+    '    SEL.id=id;SEL.i=0;OPTS=[{q:1,d:0,t:"1 unidad"}];',
+    '    var of=p.offers||[];',
+    '    for(var i=0;i<of.length;i++){if(of[i]&&of[i].q>=2){OPTS.push({q:of[i].q,d:of[i].d||0,t:of[i].t||(of[i].q+" unidades")});}}',
+    '    renderOffers();',
+    '    var err=document.getElementById("coError");if(err){err.style.display="none";}',
     '    bg.classList.add("open");dr.classList.add("open");',
     '    view("coView");',
     '  }',
-    '  function summary(){',
-    '    var c=get(),keys=Object.keys(c),parts=[];',
-    '    for(var i=0;i<keys.length;i++){var p=map(keys[i]);parts.push(c[keys[i]]+"x "+p.name);}',
-    '    return parts.join(", ");',
-    '  }',
-    '  function buildPayload(d){',
-    '    var c=get(),keys=Object.keys(c),items=[],tot=0;',
-    '    for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];tot+=p.price*q;',
-    '      items.push({id:isNaN(Number(id))?id:Number(id),name:p.name,price:p.price,originalPrice:p.price,quantity:q,image:p.image||null});}',
-    '    var main={id:items[0].id,name:(items.length>1?("Pedido de "+items.length+" productos"):items[0].name),price:tot};',
-    // El orderNumber del intento se PERSISTE en localStorage y se REUSA en
-    // reintentos: si la red falla DESPUES de que el backend creo la orden, un
-    // numero nuevo por reintento generaria ordenes duplicadas. Se borra en exito.
-    '    var att=null;try{att=localStorage.getItem("ico_order_attempt");}catch(e){}',
-    '    if(!att){att="#"+(Math.floor(Math.random()*90000)+10000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
-    '    return {orderNumber:att,product:main,products:items,quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",customer:d,isCartOrder:true,itemsCount:items.length,source:"edge_storefront"};',
-    '  }',
-    '  function fieldVal(id){var el=document.getElementById(id);return el?el.value.replace(/^\\s+|\\s+$/g,""):"";}',
-    '  function markBad(id,bad){var el=document.getElementById(id);if(el){el.className=bad?"bad":"";}}',
+    '  function fieldVal(id){var el=document.getElementById(id);return el?String(el.value||"").replace(/^\\s+|\\s+$/g,""):"";}',
+    '  function markBad(id,bad){var el=document.getElementById(id);if(el){el.classList.toggle("bad",!!bad);}}',
     '  function submitOrder(ev){',
     '    ev.preventDefault();',
-    '    var name=fieldVal("coName"),phone=fieldVal("coPhone"),addr=fieldVal("coAddr"),dept=fieldVal("coDept"),city=fieldVal("coCity");',
+    '    var name=fieldVal("coName"),last=fieldVal("coLast"),phone=fieldVal("coPhone"),dept=fieldVal("coDept"),city=fieldVal("coCity"),addr=fieldVal("coAddr"),hood=fieldVal("coHood"),mail=fieldVal("coMail");',
     '    var digits=phone.replace(/\\D/g,"");',
     '    var ok=true;',
     '    markBad("coName",!name); if(!name){ok=false;}',
+    '    markBad("coLast",!last); if(!last){ok=false;}',
     '    markBad("coPhone",digits.length<7); if(digits.length<7){ok=false;}',
-    '    markBad("coAddr",!addr); if(!addr){ok=false;}',
     '    markBad("coDept",!dept); if(!dept){ok=false;}',
     '    markBad("coCity",!city); if(!city){ok=false;}',
+    '    markBad("coAddr",!addr); if(!addr){ok=false;}',
+    '    markBad("coHood",!hood); if(!hood){ok=false;}',
     '    var err=document.getElementById("coError");',
     '    if(!ok){err.style.display="block";err.textContent="Completa los campos marcados para crear tu pedido.";return;}',
     '    err.style.display="none";',
+    '    var p=map(SEL.id);var o=curOpt();var unit=unitPrice(p.price,o.d);var tot=unit*o.q;',
     '    var btn=document.getElementById("coSubmit");btn.disabled=true;var prev=btn.textContent;btn.textContent="Creando tu pedido...";',
-    '    var d={fullName:name,phone:phone,whatsapp:phone,address:addr,department:dept,city:city,email:""};',
-    '    var resumen=summary(); var totalTxt=fmt(total());',
-    '    var body=buildPayload(d);',
+    '    var pid=isNaN(Number(SEL.id))?SEL.id:Number(SEL.id);',
+    // El orderNumber del intento se persiste y REUSA en reintentos (si la red
+    // falla despues de crear la orden, un numero nuevo duplicaria pedidos).
+    '    var att=null;try{att=localStorage.getItem("ico_order_attempt");}catch(e){}',
+    '    if(!att){att="#"+(Math.floor(Math.random()*90000)+10000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
+    '    var body={orderNumber:att,',
+    '      product:{id:pid,name:p.name,price:tot},',
+    '      products:[{id:pid,name:p.name,price:unit,originalPrice:p.price,quantity:o.q,offerApplied:(o.d?{title:o.t,quantityReq:o.q,discount:o.d}:null),image:p.image||null}],',
+    '      quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",',
+    '      customer:{fullName:(name+" "+last),phone:phone,whatsapp:phone,address:(addr+", "+hood),department:dept,city:city,email:mail},',
+    '      quantityOfferApplied:!!o.d,quantityOfferTitle:(o.d?o.t:null),quantityOfferDiscount:(o.d||null),',
+    '      isCartOrder:true,itemsCount:1,source:"edge_storefront"};',
+    '    var resumen=(o.q+"x "+p.name);var totalTxt=fmt(tot);',
     '    fetch(API+"/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})',
     '      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:null};});})',
     '      .then(function(res){',
-    '        btn.disabled=false;btn.textContent=prev;',
+    '        btn.disabled=false;btn.textContent=prev;updateTotals();',
     '        if(!res.ok||!res.j||res.j.success===false){',
     '          var m=(res.j&&res.j.message)||"No pudimos crear tu pedido. Intenta de nuevo.";',
     '          err.style.display="block";err.textContent=m;return;',
     '        }',
     '        var num=String((res.j.data&&res.j.data.order_number)||body.orderNumber).replace(/^#/,"");',
-    '        localStorage.removeItem(KEY); try{localStorage.removeItem("ico_order_attempt");}catch(e){} render();',
+    '        try{localStorage.removeItem("ico_order_attempt");}catch(e){}',
     '        var msgEl=document.getElementById("doneMsg");',
     '        if(msgEl){msgEl.textContent="Tu pedido #"+num+" quedo registrado y pagas al recibirlo (contra entrega). Te contactaremos para coordinar la entrega.";}',
     '        var waBtn=document.getElementById("doneWa");',
@@ -339,16 +365,14 @@ function hydrationScript() {
     '        } else if(waBtn){waBtn.style.display="none";}',
     '        view("doneView");',
     '      })',
-    '      .catch(function(){btn.disabled=false;btn.textContent=prev;err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
+    '      .catch(function(){btn.disabled=false;btn.textContent=prev;updateTotals();err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
     '  }',
-    // Delegacion con closest(): el click puede caer en un HIJO del boton (el
-    // <span> del contador del carrito, el <span class="cnt"> del chip, etc.) y
-    // ahi t.dataset/t.id del target directo NO matchean. closest() sube hasta
-    // el elemento con el atributo/id esperado.
+    // Delegacion con closest(): el click puede caer en un HIJO del boton.
     '  document.addEventListener("click",function(e){',
     '    var t=e.target; if(!t||!t.closest){return;}',
     '    var el;',
     '    if((el=t.closest("[data-buy]"))){buyNow(el.dataset.buy);}',
+    '    else if((el=t.closest("[data-off]"))){SEL.i=parseInt(el.dataset.off,10)||0;renderOffers();}',
     '    else if(t.id==="drawerBg"||t.closest("#cartClose")){close();}',
     '    else if((el=t.closest("[data-catbtn]"))){',
     '      var sel=el.dataset.catbtn;',
@@ -361,7 +385,6 @@ function hydrationScript() {
     '    else if(t.closest("#doneClose")){close();}',
     '  });',
     '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);}',
-    '  render();',
     '})();',
   ].join('\n');
 }
@@ -373,10 +396,20 @@ function hydrationScript() {
 function buildProductMap(list) {
   const productMap = {};
   for (const p of list || []) {
+    // Ofertas de cantidad normalizadas para el selector del formulario:
+    // q (unidades), d (descuento %), t (titulo). Misma semantica que la SPA.
+    const offers = (Array.isArray(p.quantity_offers) ? p.quantity_offers : [])
+      .map((o) => ({
+        q: parseInt(o && o.quantity, 10) || 0,
+        d: parseInt(o && o.discount, 10) || 0,
+        t: String((o && o.title) || '').trim(),
+      }))
+      .filter((o) => o.q >= 2 && o.d > 0 && o.d < 100);
     productMap[p.id] = {
       name: p.name,
       price: Number(p.price) || 0,
       image: firstImage(p),
+      offers,
     };
   }
   return productMap;
@@ -395,26 +428,48 @@ function buildStoreJs(store) {
 // SIN CARRITO (decisión del dueño): el único flujo es Comprar → FORMULARIO de
 // pedido (contra entrega) → orden en iComfly. El drawer abre directo en el
 // formulario con el resumen del producto arriba.
-function cartShellHtml() {
+function cartShellHtml(store) {
+  // SIN CARRITO: Comprar -> formulario directo (mismo funnel que la SPA:
+  // selector de unidades con ofertas, envio gratis, totales y datos de envio).
+  // Departamento: <select> con la lista de Colombia cuando aplica; si la
+  // tienda es de otro pais, campo de texto libre.
+  const isCO = String((store && store.country) || 'Colombia').trim().toLowerCase().indexOf('colombia') === 0;
+  const DEPTS_CO = ['Amazonas','Antioquia','Arauca','Atlántico','Bogotá D.C.','Bolívar','Boyacá','Caldas','Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta','Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés y Providencia','Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada'];
+  const deptField = isCO
+    ? `<select id="coDept"><option value="">Departamento</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
+    : `<input id="coDept" type="text" placeholder="Departamento / Provincia">`;
   return `
   <div id="drawerBg" class="drawer-bg"></div>
   <aside id="drawer" class="drawer" aria-label="Pedido">
-    <h2>Completa tu pedido <button id="cartClose" class="close" type="button">&times;</button></h2>
+    <h2>Ordena ya y paga al recibir <button id="cartClose" class="close" type="button">&times;</button></h2>
     <div id="coView" class="dview co">
-      <div id="coSummary" class="co-sum"></div>
+      <div id="coOffers" class="offs"></div>
+      <div class="shiprow"><span>&#9679;&nbsp; Envío Gratis</span><b>Gratis</b></div>
+      <div class="totrows">
+        <div><span>Subtotal</span><span id="tSub"></span></div>
+        <div><span>Envío</span><span class="freegreen">Gratis</span></div>
+        <div class="tt"><span>Total</span><span id="tTot"></span></div>
+      </div>
+      <div class="co-head">Ingresa los datos de envío</div>
       <form id="coForm" novalidate>
-        <label for="coName">Nombre completo</label>
-        <input id="coName" type="text" autocomplete="name" placeholder="Tu nombre y apellido">
-        <label for="coPhone">Celular / WhatsApp</label>
-        <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="3001234567">
-        <label for="coAddr">Direcci&oacute;n exacta</label>
-        <input id="coAddr" type="text" autocomplete="street-address" placeholder="Calle 1 # 2-34, barrio">
-        <label for="coDept">Departamento</label>
-        <input id="coDept" type="text" placeholder="Cundinamarca">
-        <label for="coCity">Ciudad</label>
-        <input id="coCity" type="text" autocomplete="address-level2" placeholder="Bogot&aacute;">
+        <label for="coName">Nombre <i>*</i></label>
+        <input id="coName" type="text" autocomplete="given-name" placeholder="Nombre">
+        <label for="coLast">Apellido <i>*</i></label>
+        <input id="coLast" type="text" autocomplete="family-name" placeholder="Apellido">
+        <label for="coPhone">Whatsapp / Celular <i>*</i></label>
+        <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Whatsapp / celular">
+        <label for="coDept">Departamento <i>*</i></label>
+        ${deptField}
+        <label for="coCity">Ciudad <i>*</i></label>
+        <input id="coCity" type="text" autocomplete="address-level2" placeholder="Ciudad">
+        <label for="coAddr">Dirección de residencia <i>*</i></label>
+        <input id="coAddr" type="text" autocomplete="street-address" placeholder="Dirección detallada (OBLIGATORIO)">
+        <label for="coHood">Nombre Barrio - Número casa o Apto <i>*</i></label>
+        <input id="coHood" type="text" placeholder="Barrio/Conjunto/Torre/#Apto/#Casa">
+        <label for="coMail">Correo electrónico</label>
+        <input id="coMail" type="email" autocomplete="email" placeholder="Correo electrónico">
         <div id="coError" class="co-error" style="display:none"></div>
-        <button id="coSubmit" class="wa co-submit" type="submit">Confirmar pedido — pago contra entrega</button>
+        <button id="coSubmit" class="finish" type="submit">Finaliza Tu Pedido Contra Entrega</button>
         <button id="coBack" class="co-back" type="button">Cancelar</button>
       </form>
     </div>
@@ -554,7 +609,7 @@ export function renderStorePage({ store, products, bakedAt }) {
   </main>
   <!-- baked: ${esc(bakedAt)} | ${list.length} productos -->
 
-${cartShellHtml()}
+${cartShellHtml(store)}
 
   ${runtimeScripts(storeJs, productMap)}
 </body>
@@ -673,7 +728,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   </main>
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
-${cartShellHtml()}
+${cartShellHtml(store)}
 
   ${runtimeScripts(storeJs, productMap)}
   <script>${galleryScript}</script>

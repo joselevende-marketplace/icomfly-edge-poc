@@ -83,6 +83,7 @@ async function main() {
     currency: process.env.CURRENCY || store.currency || 'COP',
     currency_symbol: process.env.CURRENCY_SYMBOL || store.currency_symbol || '$',
     currency_locale: process.env.CURRENCY_LOCALE || store.currency_locale || 'es-CO',
+    country: store.country || 'Colombia',
     web_page_html: store.web_page_html || '',
     web_sections: store.web_sections || [],
     contact: { ...(store.contact || {}), whatsapp: process.env.WHATSAPP || (store.contact && store.contact.whatsapp) || store.whatsapp || '' },
