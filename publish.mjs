@@ -65,17 +65,53 @@ async function preserveLive(sub) {
   await mkdir(join(DIST, sub), { recursive: true });
   await writeFile(join(DIST, sub, 'index.html'), await idx.text(), 'utf8');
   // meta.json es lo que el Worker usa para validar que la tienda existe; preservarlo.
+  // Ademas trae product_ids (ids con ficha horneada): sin re-bajarlas tambien,
+  // un fallo de horneado SACARIA del edge todas las producto/<id>/ de la tienda
+  // (el deploy de Pages reemplaza el dist/ completo).
   const meta = await fetch(`${PAGES_ORIGIN}/${sub}/meta.json`);
   if (meta.ok && (meta.headers.get('content-type') || '').includes('json')) {
-    await writeFile(join(DIST, sub, 'meta.json'), await meta.text(), 'utf8');
+    const metaText = await meta.text();
+    await writeFile(join(DIST, sub, 'meta.json'), metaText, 'utf8');
+    let ids = [];
+    try {
+      const parsed = JSON.parse(metaText);
+      if (Array.isArray(parsed.product_ids)) ids = parsed.product_ids;
+    } catch { /* meta ilegible -> sin fichas que preservar */ }
+    let saved = 0;
+    for (const id of ids) {
+      // id saneado: solo caracteres de path seguros (viene de un meta.json remoto).
+      const safeId = String(id).replace(/[^A-Za-z0-9_-]/g, '');
+      if (!safeId) continue;
+      // Tolerante a fallos POR FICHA: una ficha que no baje no impide preservar las demas.
+      try {
+        const ph = await fetch(`${PAGES_ORIGIN}/${sub}/producto/${safeId}/index.html`);
+        if (!ph.ok) continue;
+        const pDir = join(DIST, sub, 'producto', safeId);
+        await mkdir(pDir, { recursive: true });
+        await writeFile(join(pDir, 'index.html'), await ph.text(), 'utf8');
+        saved++;
+      } catch { /* ficha no preservada; seguir con la siguiente */ }
+    }
+    if (ids.length) log(`     fichas de producto preservadas de ${sub}: ${saved}/${ids.length}`);
   }
+}
+
+// Escape HTML local: store_name viene de la API (dato de tienda) y se inyecta
+// en el indice raiz; sin escapar seria HTML injection en la pagina del indice.
+function escHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function indexHtml(stores) {
   const links = stores
     .map((s) => {
       const sub = subdomainOf(s);
-      return `<li><a href="./${sub}/">${s.store_name || sub}</a> <span class="muted">/${sub}/</span></li>`;
+      return `<li><a href="./${escHtml(sub)}/">${escHtml(s.store_name || sub)}</a> <span class="muted">/${escHtml(sub)}/</span></li>`;
     })
     .join('\n');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -147,7 +183,10 @@ async function deploy() {
 }
 
 // Lista de tiendas a hornear: las que tienen pagina web ACTIVA, segun el backend.
-// Cae a stores.json si el endpoint no responde (para no romper el horneado).
+// SIN fallback a stores.json: un archivo local desactualizado (subdominio viejo)
+// haria que un deploy con la API caida CAMBIARA el subdominio publico en vivo
+// (404 para los clientes). Mejor NO deployar que deployar mal: si la API falla,
+// se aborta con error claro y el edge conserva lo ya publicado.
 async function loadStores() {
   const API_BASE = process.env.API_BASE || 'https://api.icomfly.com/api';
   try {
@@ -160,9 +199,11 @@ async function loadStores() {
     log(`Tiendas con web activa (API): ${stores.length}`);
     return stores;
   } catch (e) {
-    log(`API /public/stores-to-bake fallo (${e.message}); uso stores.json`);
-    const cfg = JSON.parse(await readFile(join(__dirname, 'stores.json'), 'utf8'));
-    return cfg.stores || [];
+    console.error(`[publish] ERROR: la API /public/stores-to-bake no respondio (${e.message}).`);
+    console.error('[publish] Se ABORTA el horneado: sin la lista real de tiendas, deployar');
+    console.error('[publish] podria publicar subdominios obsoletos y tumbar tiendas en vivo.');
+    console.error('[publish] El edge conserva el ultimo deploy valido. Reintenta cuando la API vuelva.');
+    process.exit(1);
   }
 }
 

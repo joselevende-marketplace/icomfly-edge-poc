@@ -108,7 +108,32 @@ async function main() {
   const outFile = join(outDir, 'index.html');
   await writeFile(outFile, html, 'utf8');
 
-  // 5. Guardar un manifiesto para auditoria/medicion
+  // 5. Hornear la FICHA de cada producto -> dist/<slug>/producto/<id>/index.html
+  //    (el Worker comodin ya reenvia subrutas, asi que tienda.com/producto/<id>/
+  //    sirve esta pagina sin tocar el Worker). Un fallo en UNA ficha no tumba
+  //    el horneado de la tienda. Se hornean ANTES de escribir el meta.json para
+  //    poder registrar en el los ids realmente horneados (product_ids).
+  let productPages = 0;
+  const bakedProductIds = [];
+  for (const p of (Array.isArray(products) ? products : [])) {
+    if (!p || p.id == null) continue;
+    try {
+      const pHtml = renderProductPage({ store, product: p, products, bakedAt });
+      const pDir = join(outDir, 'producto', String(p.id));
+      await mkdir(pDir, { recursive: true });
+      await writeFile(join(pDir, 'index.html'), pHtml, 'utf8');
+      productPages++;
+      bakedProductIds.push(String(p.id));
+    } catch (e) {
+      log(`  ⚠️ ficha del producto ${p.id} fallo: ${e.message}`);
+    }
+  }
+  log(`Fichas de producto horneadas: ${productPages}`);
+
+  // 6. Guardar un manifiesto para auditoria/medicion. product_ids lo usa el
+  //    publicador (preserveLive) para re-bajar TODAS las fichas de una tienda
+  //    cuyo horneado fallo, y no sacar producto/<id>/ del edge por un fallo
+  //    transitorio.
   await writeFile(
     join(outDir, 'meta.json'),
     JSON.stringify(
@@ -118,6 +143,7 @@ async function main() {
         store_id: productsStoreId,
         store_name: store.name,
         products: Array.isArray(products) ? products.length : 0,
+        product_ids: bakedProductIds, // ids con ficha horneada (producto/<id>/)
         bytes_html: Buffer.byteLength(html, 'utf8'),
         baked_at: bakedAt,
         api_base: API_BASE,
@@ -127,25 +153,6 @@ async function main() {
     ),
     'utf8'
   );
-
-  // 6. Hornear la FICHA de cada producto -> dist/<slug>/producto/<id>/index.html
-  //    (el Worker comodin ya reenvia subrutas, asi que tienda.com/producto/<id>/
-  //    sirve esta pagina sin tocar el Worker). Un fallo en UNA ficha no tumba
-  //    el horneado de la tienda.
-  let productPages = 0;
-  for (const p of (Array.isArray(products) ? products : [])) {
-    if (!p || p.id == null) continue;
-    try {
-      const pHtml = renderProductPage({ store, product: p, products, bakedAt });
-      const pDir = join(outDir, 'producto', String(p.id));
-      await mkdir(pDir, { recursive: true });
-      await writeFile(join(pDir, 'index.html'), pHtml, 'utf8');
-      productPages++;
-    } catch (e) {
-      log(`  ⚠️ ficha del producto ${p.id} fallo: ${e.message}`);
-    }
-  }
-  log(`Fichas de producto horneadas: ${productPages}`);
 
   log(`LISTO -> ${outFile}`);
   log(`Tamano HTML: ${(Buffer.byteLength(html, 'utf8') / 1024).toFixed(1)} KB`);

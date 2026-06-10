@@ -1,8 +1,10 @@
 {
-  "_comment": "Lista de tiendas a hornear por el publicador (publish.mjs). En produccion esta lista la generaria el backend (todas las tiendas activas). Aqui se configura manual para el POC.",
+  "_comment": "DOCUMENTACION de la tienda del POC. Este archivo YA NO se usa como fallback del publicador: publish.mjs aborta (exit 1) si la API /public/stores-to-bake no responde, para no deployar con datos obsoletos y cambiar subdominios en vivo.",
+  "_nota": "Realidad actual (2026-06): el subdominio publico es 'joselevendee' (con doble e), el slug real de la tienda es 'administrador-s-store' y el store_id es 11.",
   "stores": [
     {
-      "slug": "joselevende",
+      "subdomain": "joselevendee",
+      "slug": "administrador-s-store",
       "store_id": 11,
       "currency": "COP",
       "currency_symbol": "$",

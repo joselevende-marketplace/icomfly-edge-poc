@@ -23,6 +23,11 @@ function esc(value) {
     .replace(/'/g, '&#39;');
 }
 
+// JSON seguro para incrustar dentro de <script>: escapa '<' como < para
+// que un dato con "</script>" (p.ej. el nombre de un producto) no pueda cerrar
+// el tag y ejecutar HTML/JS arbitrario (XSS). JSON.parse/JS lo leen identico.
+const safeJson = (o) => JSON.stringify(o).replace(/</g, '\\u003c');
+
 function formatPrice(value, store) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '';
@@ -121,7 +126,10 @@ function renderProductCard(product, store) {
             <span class="price">${esc(price)}</span>
             ${compare ? `<span class="compare">${esc(compare)}</span>` : ''}
           </div>
-          <button class="buy" type="button" data-add="${esc(product.id)}">Agregar al carrito</button>
+          <div class="buyrow">
+            <button class="buy" type="button" data-buy="${esc(product.id)}">Comprar</button>
+            <button class="addcart" type="button" data-add="${esc(product.id)}" title="Agregar al carrito" aria-label="Agregar al carrito">&#128722;</button>
+          </div>
         </div>
       </article>`;
 }
@@ -153,6 +161,12 @@ function criticalCss(theme) {
     .compare{font-size:.85rem;color:var(--muted);text-decoration:line-through}
     .buy{margin-top:auto;cursor:pointer;border:0;text-align:center;background:var(--primary);color:#fff;font-weight:700;padding:10px 12px;border-radius:10px;font-size:.9rem}
     .buy:hover{filter:brightness(.94)}
+    .buyrow{margin-top:auto;display:flex;gap:8px}
+    .buyrow .buy{flex:1;margin-top:0}
+    .addcart{flex:0 0 auto;cursor:pointer;border:1px solid #d8dee8;background:#fff;border-radius:10px;width:42px;font-size:1rem}
+    .addcart:hover{border-color:var(--primary)}
+    .pp-add{display:block;width:100%;border:1px solid #d8dee8;background:#fff;color:var(--text);font-weight:700;font-size:.95rem;padding:12px;border-radius:12px;cursor:pointer;margin-top:10px}
+    .pp-add:hover{border-color:var(--primary)}
     /* Chips de categorias (filtro del catalogo) */
     .cats{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:thin}
     .cats button{flex:0 0 auto;cursor:pointer;border:1px solid #d8dee8;background:#fff;color:var(--text);font-weight:700;font-size:.86rem;padding:7px 14px;border-radius:999px}
@@ -232,6 +246,9 @@ function hydrationScript() {
     '  var S=window.__STORE__||{}; var P=window.__PRODUCTS__||{};',
     '  var bg=document.getElementById("drawerBg"), dr=document.getElementById("drawer");',
     '  function map(id){return P[id]||{name:"Producto",price:0,image:""};}',
+    // Escapa HTML antes de concatenar a innerHTML: sin esto, un nombre/imagen de
+    // producto con markup (o un localStorage manipulado) ejecutaria JS (DOM XSS).
+    '  function eh(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}',
     '  function fmt(n){try{return new Intl.NumberFormat(S.locale||"es-CO",{style:"currency",currency:S.currency||"COP",maximumFractionDigits:0}).format(n);}catch(e){return (S.symbol||"$")+Math.round(n).toLocaleString("es-CO");}}',
     '  function get(){try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};}}',
     '  function save(c){localStorage.setItem(KEY,JSON.stringify(c));render();}',
@@ -252,7 +269,7 @@ function hydrationScript() {
     '    if(!items)return;',
     '    if(keys.length===0){items.innerHTML="<div class=\\"cart-empty\\">Tu carrito esta vacio</div>";}',
     '    else{var html="";for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];',
-    '      html+="<div class=\\"ci\\"><img src=\\""+(p.image||"")+"\\" alt=\\"\\"><div class=\\"info\\"><div>"+p.name+"</div><div>"+fmt(p.price)+"</div>"',
+    '      html+="<div class=\\"ci\\"><img src=\\""+eh(p.image||"")+"\\" alt=\\"\\"><div class=\\"info\\"><div>"+eh(p.name)+"</div><div>"+fmt(p.price)+"</div>"',
     '        +"<div class=\\"qty\\"><button data-dec=\\""+id+"\\">-</button><span>"+q+"</span><button data-inc=\\""+id+"\\">+</button><button data-rm=\\""+id+"\\" style=\\"margin-left:auto\\">x</button></div></div></div>";}',
     '      items.innerHTML=html;}',
     '    var tot=document.getElementById("cartTotal"); if(tot){tot.textContent=fmt(total());}',
@@ -260,6 +277,13 @@ function hydrationScript() {
     // CHECKOUT POR FORMULARIO (Fase 2c): crea la orden REAL en iComfly via',
     // POST /api/orders (el backend deduce el store por el producto). WhatsApp
     // pasa a ser un boton OPCIONAL en la pantalla de confirmacion.
+    // COMPRA DIRECTA: agrega el producto y abre el drawer DIRECTO en el
+    // FORMULARIO de pedido (sin pasar por la vista del carrito).
+    '  function buyNow(id){',
+    '    var c=get();c[id]=(c[id]||0)+1;save(c);',
+    '    bg.classList.add("open");dr.classList.add("open");',
+    '    view("coView");',
+    '  }',
     '  function checkout(){',
     '    var c=get(); if(Object.keys(c).length===0){return;}',
     '    view("coView");',
@@ -274,7 +298,12 @@ function hydrationScript() {
     '    for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];tot+=p.price*q;',
     '      items.push({id:isNaN(Number(id))?id:Number(id),name:p.name,price:p.price,originalPrice:p.price,quantity:q,image:p.image||null});}',
     '    var main={id:items[0].id,name:(items.length>1?("Pedido de "+items.length+" productos"):items[0].name),price:tot};',
-    '    return {orderNumber:"#"+(Math.floor(Math.random()*90000)+10000),product:main,products:items,quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",customer:d,isCartOrder:true,itemsCount:items.length,source:"edge_storefront"};',
+    // El orderNumber del intento se PERSISTE en localStorage y se REUSA en
+    // reintentos: si la red falla DESPUES de que el backend creo la orden, un
+    // numero nuevo por reintento generaria ordenes duplicadas. Se borra en exito.
+    '    var att=null;try{att=localStorage.getItem("ico_order_attempt");}catch(e){}',
+    '    if(!att){att="#"+(Math.floor(Math.random()*90000)+10000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
+    '    return {orderNumber:att,product:main,products:items,quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",customer:d,isCartOrder:true,itemsCount:items.length,source:"edge_storefront"};',
     '  }',
     '  function fieldVal(id){var el=document.getElementById(id);return el?el.value.replace(/^\\s+|\\s+$/g,""):"";}',
     '  function markBad(id,bad){var el=document.getElementById(id);if(el){el.className=bad?"bad":"";}}',
@@ -304,7 +333,7 @@ function hydrationScript() {
     '          err.style.display="block";err.textContent=m;return;',
     '        }',
     '        var num=String((res.j.data&&res.j.data.order_number)||body.orderNumber).replace(/^#/,"");',
-    '        localStorage.removeItem(KEY); render();',
+    '        localStorage.removeItem(KEY); try{localStorage.removeItem("ico_order_attempt");}catch(e){} render();',
     '        var msgEl=document.getElementById("doneMsg");',
     '        if(msgEl){msgEl.textContent="Tu pedido #"+num+" quedo registrado y pagas al recibirlo (contra entrega). Te contactaremos para coordinar la entrega.";}',
     '        var waBtn=document.getElementById("doneWa");',
@@ -317,24 +346,30 @@ function hydrationScript() {
     '      })',
     '      .catch(function(){btn.disabled=false;btn.textContent=prev;err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
     '  }',
+    // Delegacion con closest(): el click puede caer en un HIJO del boton (el
+    // <span> del contador del carrito, el <span class="cnt"> del chip, etc.) y
+    // ahi t.dataset/t.id del target directo NO matchean. closest() sube hasta
+    // el elemento con el atributo/id esperado.
     '  document.addEventListener("click",function(e){',
-    '    var t=e.target;',
-    '    if(t.dataset.add){add(t.dataset.add);}',
-    '    else if(t.dataset.inc){setQ(t.dataset.inc,(get()[t.dataset.inc]||0)+1);}',
-    '    else if(t.dataset.dec){setQ(t.dataset.dec,(get()[t.dataset.dec]||0)-1);}',
-    '    else if(t.dataset.rm){setQ(t.dataset.rm,0);}',
-    '    else if(t.id==="cartFab"){open();}',
-    '    else if(t.id==="drawerBg"||t.id==="cartClose"){close();}',
-    '    else if(t.id==="cartCheckout"){checkout();}',
-    '    else if(t.dataset.catbtn!=null){',
-    '      var sel=t.dataset.catbtn;',
+    '    var t=e.target; if(!t||!t.closest){return;}',
+    '    var el;',
+    '    if((el=t.closest("[data-buy]"))){buyNow(el.dataset.buy);}',
+    '    else if((el=t.closest("[data-add]"))){add(el.dataset.add);}',
+    '    else if((el=t.closest("[data-inc]"))){setQ(el.dataset.inc,(get()[el.dataset.inc]||0)+1);}',
+    '    else if((el=t.closest("[data-dec]"))){setQ(el.dataset.dec,(get()[el.dataset.dec]||0)-1);}',
+    '    else if((el=t.closest("[data-rm]"))){setQ(el.dataset.rm,0);}',
+    '    else if(t.closest("#cartFab")){open();}',
+    '    else if(t.id==="drawerBg"||t.closest("#cartClose")){close();}',
+    '    else if(t.closest("#cartCheckout")){checkout();}',
+    '    else if((el=t.closest("[data-catbtn]"))){',
+    '      var sel=el.dataset.catbtn;',
     '      var btns=document.querySelectorAll("[data-catbtn]");',
-    '      for(var bi=0;bi<btns.length;bi++){btns[bi].classList.toggle("on",btns[bi]===t);}',
+    '      for(var bi=0;bi<btns.length;bi++){btns[bi].classList.toggle("on",btns[bi]===el);}',
     '      var cards=document.querySelectorAll(".card[data-cat]");',
     '      for(var ci=0;ci<cards.length;ci++){var cc=cards[ci].getAttribute("data-cat");cards[ci].style.display=(!sel||cc===sel)?"":"none";}',
     '    }',
-    '    else if(t.id==="coBack"){view("cartView");}',
-    '    else if(t.id==="doneClose"){view("cartView");close();}',
+    '    else if(t.closest("#coBack")){view("cartView");}',
+    '    else if(t.closest("#doneClose")){view("cartView");close();}',
     '  });',
     '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);}',
     '  render();',
@@ -411,18 +446,27 @@ function cartShellHtml() {
 }
 
 function runtimeScripts(storeJs, productMap) {
-  return `<script>window.__STORE__=${JSON.stringify(storeJs)};window.__PRODUCTS__=${JSON.stringify(productMap)};</script>
+  // safeJson: evita que un "</script>" dentro de los datos rompa el tag (XSS).
+  return `<script>window.__STORE__=${safeJson(storeJs)};window.__PRODUCTS__=${safeJson(productMap)};</script>
   <script>${hydrationScript()}</script>`;
 }
 
 // Descripcion del producto: viene del editor de la tienda (HTML propio). Se
-// inyecta quitando <script> y handlers inline (defensa minima, mismo criterio
-// que el web_page_html). Si es texto plano, se convierte saltos en <br>.
+// inyecta quitando <script>, otros tags ejecutables/peligrosos (iframe, object,
+// embed, style, svg), handlers inline (on*) y URLs javascript:/data:text/html
+// en href/src. Si es texto plano, se convierte saltos en <br>.
 function sanitizeDescription(html) {
   if (typeof html !== 'string' || !html.trim()) return '';
   let out = html
+    // Bloques completos con su contenido
     .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+    .replace(/<(iframe|object|embed|style|svg)\b[\s\S]*?<\/\1\s*>/gi, '')
+    // Tags sueltos (apertura sin cierre, cierres huerfanos, self-closing)
+    .replace(/<\/?(script|iframe|object|embed|style|svg)\b[^>]*>/gi, '')
+    // Handlers inline (onclick, onerror, ...)
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    // href/src con esquemas ejecutables -> neutralizados a "#"
+    .replace(/\s(href|src)\s*=\s*("\s*(?:javascript:|data:text\/html)[^"]*"|'\s*(?:javascript:|data:text\/html)[^']*'|(?:javascript:|data:text\/html)[^\s>]*)/gi, ' $1="#"');
   if (!/[<>]/.test(out)) out = esc(out).replace(/\r?\n/g, '<br>');
   return optimizeHtmlImages(out);
 }
@@ -605,7 +649,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   ${mainImg ? `<meta property="og:image" content="${esc(mainImg)}">` : ''}
   ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
   <style>${criticalCss(theme)}</style>
-  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <script type="application/ld+json">${safeJson(jsonLd)}</script>
 </head>
 <body>
   <nav class="pp-top">
@@ -624,7 +668,8 @@ export function renderProductPage({ store, product, products, bakedAt }) {
         ${compare ? `<span class="pp-compare">${esc(compare)}</span>` : ''}
         ${pct > 0 ? `<span class="pp-badge">-${pct}%</span>` : ''}
       </div>
-      <button class="pp-buy" type="button" data-add="${esc(product.id)}">Agregar al carrito</button>
+      <button class="pp-buy" type="button" data-buy="${esc(product.id)}">Comprar — pago contra entrega</button>
+      <button class="pp-add" type="button" data-add="${esc(product.id)}">Agregar al carrito</button>
       ${descHtml ? `<div class="pp-desc">${descHtml}</div>` : ''}
     </section>
   </main>
