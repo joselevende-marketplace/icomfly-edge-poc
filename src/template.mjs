@@ -43,6 +43,14 @@ function firstImage(product) {
   return imgs.find((u) => typeof u === 'string' && u.startsWith('http')) || '';
 }
 
+// Categoria normalizada (minusculas, sin espacios extremos). "Sin categoria"
+// y vacios devuelven '' -> sin chip; el producto solo aparece en "Todos".
+function normalizeCategory(c) {
+  const n = String(c || '').trim().toLowerCase();
+  if (!n || n === 'sin categoria' || n === 'sin categoría') return '';
+  return n;
+}
+
 // Optimizacion de imagenes via Cloudflare Image Transformations: reescribe la URL
 // a su version redimensionada/comprimida servida por la zona myicomfly.com
 // (/cdn-cgi/image/). Requiere habilitar Transformations en el dashboard + permitir
@@ -98,8 +106,12 @@ function renderProductCard(product, store) {
   // la ficha; el boton sigue agregando al carrito sin salir de la pagina.
   const href = `producto/${esc(product.id)}/`;
 
+  // Categoria normalizada para el filtro por chips (data-cat). "Sin categoria"
+  // queda vacia: el producto solo aparece en "Todos".
+  const cat = normalizeCategory(product.category);
+
   return `
-      <article class="card">
+      <article class="card" data-cat="${esc(cat)}">
         <a class="card-link" href="${href}" aria-label="${esc(product.name)}">
           <div class="card-img">${discountBadge}${imgTag}</div>
         </a>
@@ -141,6 +153,11 @@ function criticalCss(theme) {
     .compare{font-size:.85rem;color:var(--muted);text-decoration:line-through}
     .buy{margin-top:auto;cursor:pointer;border:0;text-align:center;background:var(--primary);color:#fff;font-weight:700;padding:10px 12px;border-radius:10px;font-size:.9rem}
     .buy:hover{filter:brightness(.94)}
+    /* Chips de categorias (filtro del catalogo) */
+    .cats{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:thin}
+    .cats button{flex:0 0 auto;cursor:pointer;border:1px solid #d8dee8;background:#fff;color:var(--text);font-weight:700;font-size:.86rem;padding:7px 14px;border-radius:999px}
+    .cats button.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .cats .cnt{opacity:.6;font-weight:600}
     .empty{text-align:center;color:var(--muted);padding:60px 20px}
     footer.ico{text-align:center;color:var(--muted);font-size:.8rem;padding:24px}
     .meta{text-align:center;color:var(--muted);font-size:.72rem;padding:4px 0 0}
@@ -309,6 +326,13 @@ function hydrationScript() {
     '    else if(t.id==="cartFab"){open();}',
     '    else if(t.id==="drawerBg"||t.id==="cartClose"){close();}',
     '    else if(t.id==="cartCheckout"){checkout();}',
+    '    else if(t.dataset.catbtn!=null){',
+    '      var sel=t.dataset.catbtn;',
+    '      var btns=document.querySelectorAll("[data-catbtn]");',
+    '      for(var bi=0;bi<btns.length;bi++){btns[bi].classList.toggle("on",btns[bi]===t);}',
+    '      var cards=document.querySelectorAll(".card[data-cat]");',
+    '      for(var ci=0;ci<cards.length;ci++){var cc=cards[ci].getAttribute("data-cat");cards[ci].style.display=(!sel||cc===sel)?"":"none";}',
+    '    }',
     '    else if(t.id==="coBack"){view("cartView");}',
     '    else if(t.id==="doneClose"){view("cartView");close();}',
     '  });',
@@ -421,8 +445,28 @@ export function renderStorePage({ store, products, bakedAt }) {
   const cards = list.map((p) => renderProductCard(p, store)).join('\n');
   const customHtml = optimizeHtmlImages((store.web_page_html || '').trim());
 
+  // Chips de CATEGORIAS: solo si la tienda categoriza de verdad (>=2). Van
+  // pegados a la grilla, asi viajan con el catalogo donde el editor lo ponga.
+  const catCount = new Map();
+  for (const p of list) {
+    const k = normalizeCategory(p.category);
+    if (!k) continue;
+    if (!catCount.has(k)) {
+      const raw = String(p.category).trim();
+      catCount.set(k, { label: raw.charAt(0).toUpperCase() + raw.slice(1), n: 0 });
+    }
+    catCount.get(k).n += 1;
+  }
+  const cats = Array.from(catCount.entries()).sort((a, b) => b[1].n - a[1].n);
+  const catsBar = cats.length >= 2
+    ? `<nav class="cats" aria-label="Categorias">
+        <button type="button" class="on" data-catbtn="">Todos</button>
+        ${cats.map(([k, v]) => `<button type="button" data-catbtn="${esc(k)}">${esc(v.label)} <span class="cnt">(${v.n})</span></button>`).join('')}
+      </nav>`
+    : '';
+
   const grid = list.length
-    ? `<section class="grid">${cards}</section>`
+    ? `${catsBar}<section class="grid">${cards}</section>`
     : `<div class="empty">Esta tienda aun no tiene productos publicados.</div>`;
 
   // El web_page_html del editor trae el marcador <!--WB_CATALOG--> donde debe ir
