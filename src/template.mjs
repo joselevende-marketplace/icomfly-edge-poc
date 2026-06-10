@@ -467,7 +467,21 @@ function sanitizeDescription(html) {
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     // href/src con esquemas ejecutables -> neutralizados a "#"
     .replace(/\s(href|src)\s*=\s*("\s*(?:javascript:|data:text\/html)[^"]*"|'\s*(?:javascript:|data:text\/html)[^']*'|(?:javascript:|data:text\/html)[^\s>]*)/gi, ' $1="#"');
-  if (!/[<>]/.test(out)) out = esc(out).replace(/\r?\n/g, '<br>');
+  // SIN tags: varias descripciones se guardaron con las etiquetas perdidas y
+  // el CSS del generador quedo como texto visible (".dpd-wrap {...}"). Se
+  // limpia el CSS (comentarios y bloques regla{...}, iterativo para @media) y
+  // se formatea en parrafos. OJO: sin esc() — escapar '&' rompia entidades ya
+  // guardadas (&nbsp; se veia literal) y por definicion aqui no hay tags.
+  if (!/[<>]/.test(out)) {
+    if (/\/\*|[.#@][\w-]+[^{}\n]*\{/.test(out)) {
+      out = out.replace(/\/\*[\s\S]*?\*\//g, ' ');
+      let prev;
+      do { prev = out; out = out.replace(/[^{}]*\{[^{}]*\}/g, ' '); } while (out !== prev && out.includes('{'));
+      out = out.replace(/[{}]/g, ' ');
+    }
+    out = out.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
+    out = out ? out.split(/\n+/).map((p) => `<p>${p}</p>`).join('') : '';
+  }
   return optimizeHtmlImages(out);
 }
 
