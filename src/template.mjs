@@ -163,6 +163,21 @@ function criticalCss(theme) {
     .drawer .total{display:flex;justify-content:space-between;font-weight:800;margin-bottom:12px}
     .wa{display:block;width:100%;text-align:center;background:#25D366;color:#fff;border:0;cursor:pointer;font-weight:800;padding:13px;border-radius:12px;font-size:.95rem;text-decoration:none}
     .cart-empty{color:var(--muted);text-align:center;padding:40px 10px}
+    /* Checkout por formulario (drawer) */
+    .dview{flex:1;display:flex;flex-direction:column;min-height:0}
+    .co{overflow:auto;padding:14px 18px;display:block}
+    .co label{font-size:.8rem;font-weight:700;color:var(--muted)}
+    .co input{width:100%;padding:11px 12px;border:1px solid #d8dee8;border-radius:10px;margin:4px 0 12px;font-size:.95rem;font-family:inherit}
+    .co input.bad{border-color:#e11d48}
+    .co-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:10px}
+    .co-submit{margin-top:2px}
+    .co-submit:disabled{opacity:.6;cursor:wait}
+    .co-back{display:block;width:100%;background:none;border:0;color:var(--muted);font-weight:700;padding:12px;cursor:pointer;font-size:.9rem;margin-top:6px}
+    .co-done{text-align:center;padding:26px 8px}
+    .co-check{width:64px;height:64px;margin:0 auto 14px;border-radius:999px;background:#dcfce7;color:#16a34a;font-size:2rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .co-done h3{font-size:1.2rem;margin-bottom:8px}
+    .co-done p{color:var(--muted);font-size:.92rem;line-height:1.55;margin-bottom:16px}
+    .co-done .wa{margin-bottom:6px}
     /* Tarjeta clickeable (ficha de producto) */
     a.card-link{color:inherit;text-decoration:none;display:block}
     .card-title a.card-link:hover{color:var(--primary)}
@@ -207,7 +222,12 @@ function hydrationScript() {
     '  function setQ(id,q){var c=get();if(q<=0){delete c[id];}else{c[id]=q;}save(c);}',
     '  function count(){var c=get(),n=0;for(var k in c){n+=c[k];}return n;}',
     '  function total(){var c=get(),t=0;for(var k in c){t+=map(k).price*c[k];}return t;}',
-    '  function open(){bg.classList.add("open");dr.classList.add("open");}',
+    '  var API="https://api.icomfly.com/api";',
+    '  function view(name){',
+    '    var ids=["cartView","coView","doneView"];',
+    '    for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el){el.style.display=(ids[i]===name)?"":"none";}}',
+    '  }',
+    '  function open(){view("cartView");bg.classList.add("open");dr.classList.add("open");}',
     '  function close(){bg.classList.remove("open");dr.classList.remove("open");}',
     '  function render(){',
     '    var fab=document.getElementById("cartCount"); if(fab){fab.textContent=count();}',
@@ -220,14 +240,65 @@ function hydrationScript() {
     '      items.innerHTML=html;}',
     '    var tot=document.getElementById("cartTotal"); if(tot){tot.textContent=fmt(total());}',
     '  }',
+    // CHECKOUT POR FORMULARIO (Fase 2c): crea la orden REAL en iComfly via',
+    // POST /api/orders (el backend deduce el store por el producto). WhatsApp
+    // pasa a ser un boton OPCIONAL en la pantalla de confirmacion.
     '  function checkout(){',
-    '    var c=get(),keys=Object.keys(c); if(keys.length===0){return;}',
-    '    var msg="Hola "+(S.name||"")+", quiero pedir:\\n";',
-    '    for(var i=0;i<keys.length;i++){var p=map(keys[i]);msg+="- "+p.name+" x"+c[keys[i]]+" ("+fmt(p.price)+")\\n";}',
-    '    msg+="Total: "+fmt(total());',
-    '    var wa=(S.whatsapp||"").replace(/[^0-9]/g,"");',
-    '    var url = wa ? ("https://wa.me/"+wa+"?text="+encodeURIComponent(msg)) : ("https://wa.me/?text="+encodeURIComponent(msg));',
-    '    window.open(url,"_blank");',
+    '    var c=get(); if(Object.keys(c).length===0){return;}',
+    '    view("coView");',
+    '  }',
+    '  function summary(){',
+    '    var c=get(),keys=Object.keys(c),parts=[];',
+    '    for(var i=0;i<keys.length;i++){var p=map(keys[i]);parts.push(c[keys[i]]+"x "+p.name);}',
+    '    return parts.join(", ");',
+    '  }',
+    '  function buildPayload(d){',
+    '    var c=get(),keys=Object.keys(c),items=[],tot=0;',
+    '    for(var i=0;i<keys.length;i++){var id=keys[i],p=map(id),q=c[id];tot+=p.price*q;',
+    '      items.push({id:isNaN(Number(id))?id:Number(id),name:p.name,price:p.price,originalPrice:p.price,quantity:q,image:p.image||null});}',
+    '    var main={id:items[0].id,name:(items.length>1?("Pedido de "+items.length+" productos"):items[0].name),price:tot};',
+    '    return {orderNumber:"#"+(Math.floor(Math.random()*90000)+10000),product:main,products:items,quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",customer:d,isCartOrder:true,itemsCount:items.length,source:"edge_storefront"};',
+    '  }',
+    '  function fieldVal(id){var el=document.getElementById(id);return el?el.value.replace(/^\\s+|\\s+$/g,""):"";}',
+    '  function markBad(id,bad){var el=document.getElementById(id);if(el){el.className=bad?"bad":"";}}',
+    '  function submitOrder(ev){',
+    '    ev.preventDefault();',
+    '    var name=fieldVal("coName"),phone=fieldVal("coPhone"),addr=fieldVal("coAddr"),dept=fieldVal("coDept"),city=fieldVal("coCity");',
+    '    var digits=phone.replace(/\\D/g,"");',
+    '    var ok=true;',
+    '    markBad("coName",!name); if(!name){ok=false;}',
+    '    markBad("coPhone",digits.length<7); if(digits.length<7){ok=false;}',
+    '    markBad("coAddr",!addr); if(!addr){ok=false;}',
+    '    markBad("coDept",!dept); if(!dept){ok=false;}',
+    '    markBad("coCity",!city); if(!city){ok=false;}',
+    '    var err=document.getElementById("coError");',
+    '    if(!ok){err.style.display="block";err.textContent="Completa los campos marcados para crear tu pedido.";return;}',
+    '    err.style.display="none";',
+    '    var btn=document.getElementById("coSubmit");btn.disabled=true;var prev=btn.textContent;btn.textContent="Creando tu pedido...";',
+    '    var d={fullName:name,phone:phone,whatsapp:phone,address:addr,department:dept,city:city,email:""};',
+    '    var resumen=summary(); var totalTxt=fmt(total());',
+    '    var body=buildPayload(d);',
+    '    fetch(API+"/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})',
+    '      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:null};});})',
+    '      .then(function(res){',
+    '        btn.disabled=false;btn.textContent=prev;',
+    '        if(!res.ok||!res.j||res.j.success===false){',
+    '          var m=(res.j&&res.j.message)||"No pudimos crear tu pedido. Intenta de nuevo.";',
+    '          err.style.display="block";err.textContent=m;return;',
+    '        }',
+    '        var num=String((res.j.data&&res.j.data.order_number)||body.orderNumber).replace(/^#/,"");',
+    '        localStorage.removeItem(KEY); render();',
+    '        var msgEl=document.getElementById("doneMsg");',
+    '        if(msgEl){msgEl.textContent="Tu pedido #"+num+" quedo registrado y pagas al recibirlo (contra entrega). Te contactaremos para coordinar la entrega.";}',
+    '        var waBtn=document.getElementById("doneWa");',
+    '        var wa=(S.whatsapp||"").replace(/[^0-9]/g,"");',
+    '        if(waBtn&&wa){',
+    '          var msg="Hola "+(S.name||"")+", soy "+name+", acabo de comprar "+resumen+" por valor de "+totalTxt+", escribo para confirmar el pedido #"+num;',
+    '          waBtn.href="https://wa.me/"+wa+"?text="+encodeURIComponent(msg);waBtn.style.display="block";',
+    '        } else if(waBtn){waBtn.style.display="none";}',
+    '        view("doneView");',
+    '      })',
+    '      .catch(function(){btn.disabled=false;btn.textContent=prev;err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
     '  }',
     '  document.addEventListener("click",function(e){',
     '    var t=e.target;',
@@ -238,7 +309,10 @@ function hydrationScript() {
     '    else if(t.id==="cartFab"){open();}',
     '    else if(t.id==="drawerBg"||t.id==="cartClose"){close();}',
     '    else if(t.id==="cartCheckout"){checkout();}',
+    '    else if(t.id==="coBack"){view("cartView");}',
+    '    else if(t.id==="doneClose"){view("cartView");close();}',
     '  });',
+    '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);}',
     '  render();',
     '})();',
   ].join('\n');
@@ -276,10 +350,38 @@ function cartShellHtml() {
   <div id="drawerBg" class="drawer-bg"></div>
   <aside id="drawer" class="drawer" aria-label="Carrito">
     <h2>Tu carrito <button id="cartClose" class="close" type="button">&times;</button></h2>
-    <div id="cartItems" class="items"></div>
-    <div class="foot">
-      <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
-      <button id="cartCheckout" class="wa" type="button">Finalizar pedido por WhatsApp</button>
+    <div id="cartView" class="dview">
+      <div id="cartItems" class="items"></div>
+      <div class="foot">
+        <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
+        <button id="cartCheckout" class="wa" type="button">Finalizar pedido</button>
+      </div>
+    </div>
+    <div id="coView" class="dview co" style="display:none">
+      <form id="coForm" novalidate>
+        <label for="coName">Nombre completo</label>
+        <input id="coName" type="text" autocomplete="name" placeholder="Tu nombre y apellido">
+        <label for="coPhone">Celular / WhatsApp</label>
+        <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="3001234567">
+        <label for="coAddr">Direcci&oacute;n exacta</label>
+        <input id="coAddr" type="text" autocomplete="street-address" placeholder="Calle 1 # 2-34, barrio">
+        <label for="coDept">Departamento</label>
+        <input id="coDept" type="text" placeholder="Cundinamarca">
+        <label for="coCity">Ciudad</label>
+        <input id="coCity" type="text" autocomplete="address-level2" placeholder="Bogot&aacute;">
+        <div id="coError" class="co-error" style="display:none"></div>
+        <button id="coSubmit" class="wa co-submit" type="submit">Confirmar pedido — pago contra entrega</button>
+        <button id="coBack" class="co-back" type="button">&larr; Volver al carrito</button>
+      </form>
+    </div>
+    <div id="doneView" class="dview co" style="display:none">
+      <div class="co-done">
+        <div class="co-check">&#10003;</div>
+        <h3>&iexcl;Pedido confirmado!</h3>
+        <p id="doneMsg"></p>
+        <a id="doneWa" class="wa" target="_blank" rel="noopener" style="display:none">Confirmar por WhatsApp (opcional)</a>
+        <button id="doneClose" class="co-back" type="button">Seguir comprando</button>
+      </div>
     </div>
   </aside>`;
 }
