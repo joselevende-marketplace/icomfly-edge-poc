@@ -126,10 +126,7 @@ function renderProductCard(product, store) {
             <span class="price">${esc(price)}</span>
             ${compare ? `<span class="compare">${esc(compare)}</span>` : ''}
           </div>
-          <div class="buyrow">
-            <button class="buy" type="button" data-buy="${esc(product.id)}">Comprar</button>
-            <button class="addcart" type="button" data-add="${esc(product.id)}" title="Agregar al carrito" aria-label="Agregar al carrito">&#128722;</button>
-          </div>
+          <button class="buy" type="button" data-buy="${esc(product.id)}">Comprar</button>
         </div>
       </article>`;
 }
@@ -202,6 +199,11 @@ function criticalCss(theme) {
     .co input.bad{border-color:#e11d48}
     .co-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:10px}
     .co-submit{margin-top:2px}
+    /* Resumen del producto arriba del formulario (compra directa) */
+    .co-sum{display:flex;gap:12px;align-items:center;background:#f4f6fa;border:1px solid #e4e8f0;border-radius:12px;padding:10px 12px;margin-bottom:14px}
+    .co-sum img{width:54px;height:54px;object-fit:cover;border-radius:9px;background:#e8ecf3;flex:0 0 auto}
+    .co-sum-name{font-weight:700;font-size:.92rem;line-height:1.3}
+    .co-sum-price{color:var(--muted);font-size:.85rem;margin-top:2px}
     .co-submit:disabled{opacity:.6;cursor:wait}
     .co-back{display:block;width:100%;background:none;border:0;color:var(--muted);font-weight:700;padding:12px;cursor:pointer;font-size:.9rem;margin-top:6px}
     .co-done{text-align:center;padding:26px 8px}
@@ -252,16 +254,12 @@ function hydrationScript() {
     '  function fmt(n){try{return new Intl.NumberFormat(S.locale||"es-CO",{style:"currency",currency:S.currency||"COP",maximumFractionDigits:0}).format(n);}catch(e){return (S.symbol||"$")+Math.round(n).toLocaleString("es-CO");}}',
     '  function get(){try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};}}',
     '  function save(c){localStorage.setItem(KEY,JSON.stringify(c));render();}',
-    '  function add(id){var c=get();c[id]=(c[id]||0)+1;save(c);open();}',
-    '  function setQ(id,q){var c=get();if(q<=0){delete c[id];}else{c[id]=q;}save(c);}',
-    '  function count(){var c=get(),n=0;for(var k in c){n+=c[k];}return n;}',
     '  function total(){var c=get(),t=0;for(var k in c){t+=map(k).price*c[k];}return t;}',
     '  var API="https://api.icomfly.com/api";',
     '  function view(name){',
-    '    var ids=["cartView","coView","doneView"];',
+    '    var ids=["coView","doneView"];',
     '    for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el){el.style.display=(ids[i]===name)?"":"none";}}',
     '  }',
-    '  function open(){view("cartView");bg.classList.add("open");dr.classList.add("open");}',
     '  function close(){bg.classList.remove("open");dr.classList.remove("open");}',
     '  function render(){',
     '    var fab=document.getElementById("cartCount"); if(fab){fab.textContent=count();}',
@@ -274,18 +272,15 @@ function hydrationScript() {
     '      items.innerHTML=html;}',
     '    var tot=document.getElementById("cartTotal"); if(tot){tot.textContent=fmt(total());}',
     '  }',
-    // CHECKOUT POR FORMULARIO (Fase 2c): crea la orden REAL en iComfly via',
-    // POST /api/orders (el backend deduce el store por el producto). WhatsApp
-    // pasa a ser un boton OPCIONAL en la pantalla de confirmacion.
-    // COMPRA DIRECTA: agrega el producto y abre el drawer DIRECTO en el
-    // FORMULARIO de pedido (sin pasar por la vista del carrito).
+    // COMPRA DIRECTA (sin carrito): "Comprar" arma el pedido con ESTE producto
+    // y abre el drawer directo en el FORMULARIO, con su resumen arriba. El POST
+    // /api/orders crea la orden real (el backend deduce el store del producto).
     '  function buyNow(id){',
-    '    var c=get();c[id]=(c[id]||0)+1;save(c);',
+    '    var c={};c[id]=1;save(c);',
+    '    var p=map(id);var sm=document.getElementById("coSummary");',
+    '    if(sm){sm.innerHTML="<img src=\\""+eh(p.image||"")+"\\" alt=\\"\\"><div><div class=\\"co-sum-name\\">"+eh(p.name)+"</div><div class=\\"co-sum-price\\">"+fmt(p.price)+" &middot; pago contra entrega</div></div>";}',
+    '    var err=document.getElementById("coError"); if(err){err.style.display="none";}',
     '    bg.classList.add("open");dr.classList.add("open");',
-    '    view("coView");',
-    '  }',
-    '  function checkout(){',
-    '    var c=get(); if(Object.keys(c).length===0){return;}',
     '    view("coView");',
     '  }',
     '  function summary(){',
@@ -354,13 +349,7 @@ function hydrationScript() {
     '    var t=e.target; if(!t||!t.closest){return;}',
     '    var el;',
     '    if((el=t.closest("[data-buy]"))){buyNow(el.dataset.buy);}',
-    '    else if((el=t.closest("[data-add]"))){add(el.dataset.add);}',
-    '    else if((el=t.closest("[data-inc]"))){setQ(el.dataset.inc,(get()[el.dataset.inc]||0)+1);}',
-    '    else if((el=t.closest("[data-dec]"))){setQ(el.dataset.dec,(get()[el.dataset.dec]||0)-1);}',
-    '    else if((el=t.closest("[data-rm]"))){setQ(el.dataset.rm,0);}',
-    '    else if(t.closest("#cartFab")){open();}',
     '    else if(t.id==="drawerBg"||t.closest("#cartClose")){close();}',
-    '    else if(t.closest("#cartCheckout")){checkout();}',
     '    else if((el=t.closest("[data-catbtn]"))){',
     '      var sel=el.dataset.catbtn;',
     '      var btns=document.querySelectorAll("[data-catbtn]");',
@@ -368,8 +357,8 @@ function hydrationScript() {
     '      var cards=document.querySelectorAll(".card[data-cat]");',
     '      for(var ci=0;ci<cards.length;ci++){var cc=cards[ci].getAttribute("data-cat");cards[ci].style.display=(!sel||cc===sel)?"":"none";}',
     '    }',
-    '    else if(t.closest("#coBack")){view("cartView");}',
-    '    else if(t.closest("#doneClose")){view("cartView");close();}',
+    '    else if(t.closest("#coBack")){close();}',
+    '    else if(t.closest("#doneClose")){close();}',
     '  });',
     '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);}',
     '  render();',
@@ -403,20 +392,16 @@ function buildStoreJs(store) {
   };
 }
 
+// SIN CARRITO (decisión del dueño): el único flujo es Comprar → FORMULARIO de
+// pedido (contra entrega) → orden en iComfly. El drawer abre directo en el
+// formulario con el resumen del producto arriba.
 function cartShellHtml() {
   return `
-  <button id="cartFab" class="cart-fab" type="button">🛒 Carrito <span id="cartCount" class="count">0</span></button>
   <div id="drawerBg" class="drawer-bg"></div>
-  <aside id="drawer" class="drawer" aria-label="Carrito">
-    <h2>Tu carrito <button id="cartClose" class="close" type="button">&times;</button></h2>
-    <div id="cartView" class="dview">
-      <div id="cartItems" class="items"></div>
-      <div class="foot">
-        <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
-        <button id="cartCheckout" class="wa" type="button">Finalizar pedido</button>
-      </div>
-    </div>
-    <div id="coView" class="dview co" style="display:none">
+  <aside id="drawer" class="drawer" aria-label="Pedido">
+    <h2>Completa tu pedido <button id="cartClose" class="close" type="button">&times;</button></h2>
+    <div id="coView" class="dview co">
+      <div id="coSummary" class="co-sum"></div>
       <form id="coForm" novalidate>
         <label for="coName">Nombre completo</label>
         <input id="coName" type="text" autocomplete="name" placeholder="Tu nombre y apellido">
@@ -430,7 +415,7 @@ function cartShellHtml() {
         <input id="coCity" type="text" autocomplete="address-level2" placeholder="Bogot&aacute;">
         <div id="coError" class="co-error" style="display:none"></div>
         <button id="coSubmit" class="wa co-submit" type="submit">Confirmar pedido — pago contra entrega</button>
-        <button id="coBack" class="co-back" type="button">&larr; Volver al carrito</button>
+        <button id="coBack" class="co-back" type="button">Cancelar</button>
       </form>
     </div>
     <div id="doneView" class="dview co" style="display:none">
@@ -683,7 +668,6 @@ export function renderProductPage({ store, product, products, bakedAt }) {
         ${pct > 0 ? `<span class="pp-badge">-${pct}%</span>` : ''}
       </div>
       <button class="pp-buy" type="button" data-buy="${esc(product.id)}">Comprar — pago contra entrega</button>
-      <button class="pp-add" type="button" data-add="${esc(product.id)}">Agregar al carrito</button>
       ${descHtml ? `<div class="pp-desc">${descHtml}</div>` : ''}
     </section>
   </main>
