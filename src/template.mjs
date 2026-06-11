@@ -290,7 +290,8 @@ function hydrationScript() {
     '    var p=map(SEL.id);var o=curOpt();var tot=unitPrice(p.price,o.d)*o.q;',
     '    var sub=document.getElementById("tSub");if(sub){sub.textContent=fmt(tot);}',
     '    var t=document.getElementById("tTot");if(t){t.textContent=fmt(tot);}',
-    '    var b=document.getElementById("coSubmit");if(b&&!b.disabled){b.textContent="Finaliza Tu Pedido Contra Entrega - "+fmt(tot);}',
+    // Texto base del CTA configurable (S.ctaText viene de buildStoreJs).
+    '    var b=document.getElementById("coSubmit");if(b&&!b.disabled){b.textContent=(S.ctaText||"Finaliza Tu Pedido Contra Entrega")+" - "+fmt(tot);}',
     '  }',
     '  function renderOffers(){',
     '    var p=map(SEL.id);var box=document.getElementById("coOffers");if(!box){return;}',
@@ -331,7 +332,9 @@ function hydrationScript() {
     '    if(!ok){err.style.display="block";err.textContent="Completa los campos marcados para crear tu pedido.";return;}',
     '    err.style.display="none";',
     '    var p=map(SEL.id);var o=curOpt();var unit=unitPrice(p.price,o.d);var tot=unit*o.q;',
-    '    var btn=document.getElementById("coSubmit");btn.disabled=true;var prev=btn.textContent;btn.textContent="Creando tu pedido...";',
+    '    var btn=document.getElementById("coSubmit");btn.disabled=true;btn.textContent="Creando tu pedido...";',
+    // Restaura el CTA configurable tras el intento (updateTotals re-agrega el total).
+    '    function restoreBtn(){btn.disabled=false;btn.textContent=(S.ctaText||"Finaliza Tu Pedido Contra Entrega");updateTotals();}',
     '    var pid=isNaN(Number(SEL.id))?SEL.id:Number(SEL.id);',
     // El orderNumber del intento se persiste y REUSA en reintentos (si la red
     // falla despues de crear la orden, un numero nuevo duplicaria pedidos).
@@ -348,7 +351,7 @@ function hydrationScript() {
     '    fetch(API+"/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})',
     '      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:null};});})',
     '      .then(function(res){',
-    '        btn.disabled=false;btn.textContent=prev;updateTotals();',
+    '        restoreBtn();',
     '        if(!res.ok||!res.j||res.j.success===false){',
     '          var m=(res.j&&res.j.message)||"No pudimos crear tu pedido. Intenta de nuevo.";',
     '          err.style.display="block";err.textContent=m;return;',
@@ -365,7 +368,7 @@ function hydrationScript() {
     '        } else if(waBtn){waBtn.style.display="none";}',
     '        view("doneView");',
     '      })',
-    '      .catch(function(){btn.disabled=false;btn.textContent=prev;updateTotals();err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
+    '      .catch(function(){restoreBtn();err.style.display="block";err.textContent="Sin conexion. Revisa tu internet e intenta de nuevo.";});',
     '  }',
     // Delegacion con closest(): el click puede caer en un HIJO del boton.
     '  document.addEventListener("click",function(e){',
@@ -422,7 +425,67 @@ function buildStoreJs(store) {
     currency: store.currency || 'COP',
     symbol: store.currency_symbol || '$',
     locale: store.currency_locale || 'es-CO',
+    // Texto base del CTA: la hidratacion lo re-pinta con el total
+    // (S.ctaText + ' - ' + fmt(tot)). Configurable via checkout_form.ctaText.
+    ctaText: String(checkoutCfg(store).ctaText || CTA_DEFAULT),
   };
+}
+
+// --- Personalizacion del formulario de checkout (theme_config.checkout_form) ---
+// Contrato compartido: { title, subtitle, ctaText, labels:{...}, colors:{...},
+// font, radius, showEmail }. TODO opcional; sin config el drawer queda IDENTICO
+// al look actual (cero regresion).
+
+// Saneo de valores CSS del dueño: solo caracteres seguros para un color/valor
+// simple. Evita que un "}" o "<" en la config rompa el <style> o inyecte HTML.
+function cssVal(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^[#a-zA-Z0-9(),.%\s-]{1,64}$/.test(s) ? s : '';
+}
+
+// Texto del CTA por defecto (compartido entre HTML, hidratacion y buildStoreJs).
+const CTA_DEFAULT = 'Finaliza Tu Pedido Contra Entrega';
+
+// Config del formulario (objeto vacio si la tienda no configuro nada).
+function checkoutCfg(store) {
+  return (store && store.theme_config && store.theme_config.checkout_form) || {};
+}
+
+// Font-family del drawer segun cfg.font ('' = sin override -> hereda el actual).
+function checkoutFont(font) {
+  if (font === 'serif') return "Georgia,'Times New Roman',serif";
+  if (font === 'rounded') return "'Trebuchet MS',Verdana,sans-serif";
+  return ''; // 'system' o ausente -> inherit (look actual)
+}
+
+// Bloque <style> con overrides SOLO de las claves presentes en la config.
+// Sin config devuelve '' -> no se emite nada (HTML identico al actual).
+function checkoutCss(cfg) {
+  const c = cfg.colors || {};
+  const rules = [];
+  const bg = cssVal(c.bg);
+  const text = cssVal(c.text);
+  if (bg) rules.push(`.drawer{background:${bg}}`);
+  if (text) rules.push(`.drawer,.drawer h2,.co label,.co-head{color:${text}}`);
+  const fieldBg = cssVal(c.fieldBg);
+  const fieldBorder = cssVal(c.fieldBorder);
+  if (fieldBg) rules.push(`.co input,.co select,.off{background:${fieldBg}}`);
+  if (fieldBorder) rules.push(`.co input,.co select,.off{border-color:${fieldBorder}}`);
+  const accent = cssVal(c.accent);
+  if (accent) rules.push(`.off.on{border-color:${accent};box-shadow:0 0 0 1px ${accent};background:${fieldBg || '#f4f9ff'}}`);
+  const cta = cssVal(c.cta);
+  const ctaText = cssVal(c.ctaText);
+  if (cta) rules.push(`.finish{background:${cta}}`);
+  if (ctaText) rules.push(`.finish{color:${ctaText}}`);
+  const radius = Number(cfg.radius);
+  if (Number.isFinite(radius) && radius >= 0) {
+    const r = Math.min(Math.round(radius), 40);
+    rules.push(`.co input,.co select,.off{border-radius:${r}px}`);
+    rules.push(`.finish{border-radius:${r}px}`);
+  }
+  const font = checkoutFont(cfg.font);
+  if (font) rules.push(`.drawer{font-family:${font}}`);
+  return rules.length ? `\n  <style>${rules.join('')}</style>` : '';
 }
 
 // SIN CARRITO (decisión del dueño): el único flujo es Comprar → FORMULARIO de
@@ -435,13 +498,38 @@ function cartShellHtml(store) {
   // tienda es de otro pais, campo de texto libre.
   const isCO = String((store && store.country) || 'Colombia').trim().toLowerCase().indexOf('colombia') === 0;
   const DEPTS_CO = ['Amazonas','Antioquia','Arauca','Atlántico','Bogotá D.C.','Bolívar','Boyacá','Caldas','Caquetá','Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca','Guainía','Guaviare','Huila','La Guajira','Magdalena','Meta','Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés y Providencia','Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada'];
+
+  // Personalizacion del formulario (theme_config.checkout_form). Todos los
+  // textos del dueño pasan por esc(); defaults = look actual (cero regresion).
+  const cfg = checkoutCfg(store);
+  const L = cfg.labels || {};
+  const title = esc(cfg.title || 'Ordena ya y paga al recibir');
+  const subtitle = esc(cfg.subtitle || 'Ingresa los datos de envío');
+  const ctaText = esc(cfg.ctaText || CTA_DEFAULT);
+  const lblNombre = esc(L.nombre || 'Nombre');
+  const lblApellido = esc(L.apellido || 'Apellido');
+  const lblWhatsapp = esc(L.whatsapp || 'Whatsapp / Celular');
+  const lblDepto = esc(L.departamento || 'Departamento');
+  const lblCiudad = esc(L.ciudad || 'Ciudad');
+  const lblDireccion = esc(L.direccion || 'Dirección de residencia');
+  const lblBarrio = esc(L.barrio || 'Nombre Barrio - Número casa o Apto');
+  const lblCorreo = esc(L.correo || 'Correo electrónico');
+
   const deptField = isCO
-    ? `<select id="coDept"><option value="">Departamento</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
-    : `<input id="coDept" type="text" placeholder="Departamento / Provincia">`;
-  return `
+    ? `<select id="coDept"><option value="">${lblDepto}</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
+    : `<input id="coDept" type="text" placeholder="${lblDepto} / Provincia">`;
+
+  // Campo correo: opcional en el pedido; si showEmail === false NO se emite.
+  // La hidratacion lo tolera: fieldVal() devuelve '' cuando el id no existe.
+  const mailField = cfg.showEmail === false
+    ? ''
+    : `<label for="coMail">${lblCorreo}</label>
+        <input id="coMail" type="email" autocomplete="email" placeholder="${lblCorreo}">`;
+
+  return `${checkoutCss(cfg)}
   <div id="drawerBg" class="drawer-bg"></div>
   <aside id="drawer" class="drawer" aria-label="Pedido">
-    <h2>Ordena ya y paga al recibir <button id="cartClose" class="close" type="button">&times;</button></h2>
+    <h2>${title} <button id="cartClose" class="close" type="button">&times;</button></h2>
     <div id="coView" class="dview co">
       <div id="coOffers" class="offs"></div>
       <div class="shiprow"><span>&#9679;&nbsp; Envío Gratis</span><b>Gratis</b></div>
@@ -450,26 +538,25 @@ function cartShellHtml(store) {
         <div><span>Envío</span><span class="freegreen">Gratis</span></div>
         <div class="tt"><span>Total</span><span id="tTot"></span></div>
       </div>
-      <div class="co-head">Ingresa los datos de envío</div>
+      <div class="co-head">${subtitle}</div>
       <form id="coForm" novalidate>
-        <label for="coName">Nombre <i>*</i></label>
-        <input id="coName" type="text" autocomplete="given-name" placeholder="Nombre">
-        <label for="coLast">Apellido <i>*</i></label>
-        <input id="coLast" type="text" autocomplete="family-name" placeholder="Apellido">
-        <label for="coPhone">Whatsapp / Celular <i>*</i></label>
-        <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Whatsapp / celular">
-        <label for="coDept">Departamento <i>*</i></label>
+        <label for="coName">${lblNombre} <i>*</i></label>
+        <input id="coName" type="text" autocomplete="given-name" placeholder="${lblNombre}">
+        <label for="coLast">${lblApellido} <i>*</i></label>
+        <input id="coLast" type="text" autocomplete="family-name" placeholder="${lblApellido}">
+        <label for="coPhone">${lblWhatsapp} <i>*</i></label>
+        <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="${lblWhatsapp}">
+        <label for="coDept">${lblDepto} <i>*</i></label>
         ${deptField}
-        <label for="coCity">Ciudad <i>*</i></label>
-        <input id="coCity" type="text" autocomplete="address-level2" placeholder="Ciudad">
-        <label for="coAddr">Dirección de residencia <i>*</i></label>
+        <label for="coCity">${lblCiudad} <i>*</i></label>
+        <input id="coCity" type="text" autocomplete="address-level2" placeholder="${lblCiudad}">
+        <label for="coAddr">${lblDireccion} <i>*</i></label>
         <input id="coAddr" type="text" autocomplete="street-address" placeholder="Dirección detallada (OBLIGATORIO)">
-        <label for="coHood">Nombre Barrio - Número casa o Apto <i>*</i></label>
+        <label for="coHood">${lblBarrio} <i>*</i></label>
         <input id="coHood" type="text" placeholder="Barrio/Conjunto/Torre/#Apto/#Casa">
-        <label for="coMail">Correo electrónico</label>
-        <input id="coMail" type="email" autocomplete="email" placeholder="Correo electrónico">
+        ${mailField}
         <div id="coError" class="co-error" style="display:none"></div>
-        <button id="coSubmit" class="finish" type="submit">Finaliza Tu Pedido Contra Entrega</button>
+        <button id="coSubmit" class="finish" type="submit">${ctaText}</button>
         <button id="coBack" class="co-back" type="button">Cancelar</button>
       </form>
     </div>
