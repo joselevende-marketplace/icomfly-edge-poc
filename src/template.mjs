@@ -261,6 +261,11 @@ function criticalCss(theme) {
     .pp-desc p{margin:8px 0}
     /* === Ficha de producto v2: paridad con la SPA (ProductPage.jsx) === */
     body.pp-page{background:#fff}
+    /* En la ficha de producto el checkout abre CENTRADO como el CheckoutModal
+       de la SPA (CheckoutModal.jsx: fixed inset-0 items-center, max-w-lg,
+       rounded-2xl, max-h 90vh). La portada conserva el drawer lateral. */
+    body.pp-page .drawer{top:50%;left:50%;right:auto;bottom:auto;height:auto;max-height:90vh;width:min(512px,92vw);border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);transform:translate(-50%,-50%) scale(.96);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+    body.pp-page .drawer.open{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
     .pp-wrap{max-width:1080px;margin:0 auto;padding:22px 16px 90px}
     .pp2{display:grid;gap:26px;grid-template-columns:1fr}
     @media(min-width:880px){.pp2{grid-template-columns:1.05fr 1fr;align-items:start}}
