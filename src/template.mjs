@@ -259,6 +259,50 @@ function criticalCss(theme) {
     .pp-desc img{max-width:100%;height:auto;border-radius:10px}
     .pp-desc h2,.pp-desc h3{margin:14px 0 8px}
     .pp-desc p{margin:8px 0}
+    /* === Ficha de producto v2: paridad con la SPA (ProductPage.jsx) === */
+    body.pp-page{background:#fff}
+    .pp-wrap{max-width:1080px;margin:0 auto;padding:22px 16px 90px}
+    .pp2{display:grid;gap:26px;grid-template-columns:1fr}
+    @media(min-width:880px){.pp2{grid-template-columns:1.05fr 1fr;align-items:start}}
+    .ppg{width:100%;user-select:none}
+    @media(min-width:880px){.ppg{max-width:70%;margin:0 auto}}
+    .ppg-stage{position:relative;background:#fff}
+    .ppg-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none;touch-action:pan-x pan-y}
+    .ppg-track::-webkit-scrollbar{display:none}
+    .ppg-slide{width:100%;flex:0 0 100%;scroll-snap-align:center;aspect-ratio:1/1;background:#fff;display:flex;align-items:center;justify-content:center}
+    .ppg-slide img{width:100%;height:100%;object-fit:cover;display:block}
+    @media(min-width:880px){.ppg-slide img{object-fit:contain}}
+    .ppg-noimg{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--muted);background:#eef1f5;border-radius:16px}
+    .ppg-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10}
+    .ppg-dots button{width:9px;height:9px;border-radius:999px;border:0;cursor:pointer;background:rgba(255,255,255,.6);box-shadow:0 1px 2px rgba(0,0,0,.18);padding:0}
+    .ppg-dots button.on{background:#fff;transform:scale(1.15);box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+    .ppg-thumbs{display:none}
+    @media(min-width:880px){.ppg-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}}
+    .ppg-thumbs button{aspect-ratio:1/1;border:2px solid transparent;border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;opacity:.7;padding:0}
+    .ppg-thumbs button.on{border-color:#000;opacity:1}
+    .ppg-thumbs button:hover{opacity:1;border-color:#e5e7eb}
+    .ppg-thumbs img{width:100%;height:100%;object-fit:contain;display:block}
+    .pp-info2 h1{font-size:1.5rem;font-weight:700;line-height:1.25;margin-bottom:12px}
+    @media(min-width:880px){.pp-info2 h1{font-size:1.875rem}}
+    .pp-rrow{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+    .pp-stars{color:#f59e0b;font-size:1.05rem;letter-spacing:1px;line-height:1}
+    .pp-stars .soff{color:#d1d5db}
+    .pp-rcount{color:#4b5563;font-weight:500;font-size:.875rem}
+    .pp-prices2{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .pp-price2{font-size:1.875rem;font-weight:700}
+    @media(min-width:880px){.pp-price2{font-size:2.25rem}}
+    .pp-compare2{color:#6b7280;text-decoration:line-through;font-size:1.125rem}
+    .pp-save{background:#000;color:#fff;padding:4px 12px;border-radius:4px;font-size:.875rem;font-weight:600}
+    .pp-bens{display:flex;flex-direction:column;gap:8px;margin:0 0 24px}
+    .pp-bens div{display:flex;align-items:center;gap:8px;font-size:.875rem;color:#374151}
+    .pp-cta{width:100%;border:0;cursor:pointer;padding:16px;border-radius:12px;font-weight:700;font-size:1.125rem;display:flex;align-items:center;justify-content:center;gap:12px;transition:transform .15s;animation:ppshake 2.5s ease-in-out infinite;animation-delay:1s}
+    .pp-cta:hover{transform:scale(1.03);animation:none}
+    .pp-cta svg{flex:0 0 auto}
+    @keyframes ppshake{0%{transform:rotate(0)}6%{transform:rotate(3deg)}12%{transform:rotate(-3deg)}18%{transform:rotate(3deg)}24%{transform:rotate(-3deg)}30%{transform:rotate(2deg)}36%{transform:rotate(-2deg)}42%{transform:rotate(1deg)}48%{transform:rotate(-1deg)}54%,100%{transform:rotate(0)}}
+    .pp-desc2{margin:48px auto 0;max-width:896px;line-height:1.65;color:#374151;overflow-wrap:anywhere}
+    .pp-desc2 img{max-width:100%;height:auto;border-radius:10px}
+    .pp-desc2 h2,.pp-desc2 h3{margin:14px 0 8px;color:var(--text)}
+    .pp-desc2 p{margin:8px 0}
   `.trim();
 }
 
@@ -718,29 +762,55 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   const hasCompare =
     product.compare_price && Number(product.compare_price) > Number(product.price);
   const compare = hasCompare ? formatPrice(product.compare_price, store) : '';
-  let pct = 0;
-  if (hasCompare) {
-    pct = Math.round((1 - Number(product.price) / Number(product.compare_price)) * 100);
-  }
 
+  // Personalización de la ficha (theme_config.product_page) con los MISMOS
+  // defaults que la SPA (src/components/product/ProductInfo.jsx). Si no hay
+  // config, se ve exactamente como la product page React por defecto.
+  const cfg = (theme && typeof theme.product_page === 'object' && theme.product_page) || {};
+  const secCfg = (cfg.sections && typeof cfg.sections === 'object') ? cfg.sections : {};
+  const showDiscountBadge = secCfg.discountBadge !== false;
+  const defaultBenefits = [
+    { icon: '📦', text: 'Puedes revisar tu pedido antes de pagar' },
+    { icon: '💡', text: 'Garantía de 1 año' },
+    { icon: '🚚', text: 'Envió gratis' },
+  ];
+  const benefits = (Array.isArray(cfg.benefits) && cfg.benefits.length) ? cfg.benefits : defaultBenefits;
+  const ctaText = (cfg.cta && typeof cfg.cta.text === 'string' && cfg.cta.text.trim()) ? cfg.cta.text : '¡PIDE CONTRA ENTREGA AQUÍ!';
+  const ctaColor = (cfg.cta && typeof cfg.cta.color === 'string' && cfg.cta.color.trim()) ? cfg.cta.color : '';
+  const ctaStyle = ctaColor
+    ? `background:${esc(ctaColor)};box-shadow:0 4px 15px ${esc(ctaColor)}66;color:#fff`
+    : 'background:linear-gradient(135deg,#00FF85 0%,#00E676 50%,#00C853 100%);box-shadow:0 4px 15px rgba(0,255,133,.4);color:#000';
+
+  // "Ahorra $X" en badge NEGRO, igual que la SPA (no "-NN%").
+  const savings = hasCompare ? formatPrice(Number(product.compare_price) - Number(product.price), store) : '';
+
+  // Rating: 5 estrellas (llenas según rating) + contador de reseñas, como
+  // RatingStars + "N reseñas" de la SPA (siempre visible, incluso con 0).
   const rating = Number(product.rating);
   const reviews = Number(product.reviews_count) || 0;
-  const ratingHtml = Number.isFinite(rating) && rating > 0
-    ? `<div class="pp-rating">★ ${rating.toFixed(1)}${reviews ? ` · ${reviews} reseña${reviews === 1 ? '' : 's'}` : ''}</div>`
-    : '';
+  const full = Number.isFinite(rating) ? Math.max(0, Math.min(5, Math.round(rating))) : 0;
+  const starsHtml = `<span class="pp-stars" aria-label="${full} de 5">${'★'.repeat(full)}<span class="soff">${'★'.repeat(5 - full)}</span></span>`;
+  const ratingHtml = `<div class="pp-rrow">${starsHtml}<span class="pp-rcount">${reviews} reseña${reviews === 1 ? '' : 's'}</span></div>`;
 
   const descHtml = sanitizeDescription(product.description || '');
   const metaDesc = plainText(product.description || '', 160) || `${product.name} en ${storeName}`;
 
-  // Galeria: imagen principal + miniaturas (swap con un JS minimo, sin deps).
-  const mainTag = mainImg
-    ? `<img id="ppMain" class="pp-main" src="${esc(cdnImage(mainImg, 900, 80))}" alt="${esc(product.name)}" decoding="async" onerror="this.onerror=null;this.src='${esc(mainImg)}'">`
-    : `<div class="pp-main noimg">Sin imagen</div>`;
+  // Galería con swipe (scroll-snap) + dots + thumbnails desktop, espejo de
+  // src/components/product/ProductGallery.jsx.
+  const slides = imgs.length
+    ? imgs.map((u, i) =>
+        `<div class="ppg-slide"><img src="${esc(cdnImage(u, 900, 80))}" alt="${esc(product.name)} - Imagen ${i + 1}" ${i === 0 ? 'decoding="sync" fetchpriority="high"' : 'loading="lazy" decoding="async"'} draggable="false" onerror="this.onerror=null;this.src='${esc(u)}'"></div>`
+      ).join('')
+    : '<div class="ppg-noimg">Sin imagen</div>';
+  const dots = imgs.length > 1
+    ? `<div class="ppg-dots" id="ppgDots">${imgs.map((_, i) => `<button type="button" class="${i === 0 ? 'on' : ''}" aria-label="Ir a imagen ${i + 1}"></button>`).join('')}</div>`
+    : '';
   const thumbs = imgs.length > 1
-    ? `<div class="pp-thumbs">${imgs.map((u, i) =>
-        `<img src="${esc(cdnImage(u, 128, 70))}" data-full="${esc(cdnImage(u, 900, 80))}" data-orig="${esc(u)}" alt="" class="${i === 0 ? 'active' : ''}" loading="lazy" onerror="this.onerror=null;this.src='${esc(u)}'">`
+    ? `<div class="ppg-thumbs" id="ppgThumbs">${imgs.map((u, i) =>
+        `<button type="button" class="${i === 0 ? 'on' : ''}" aria-label="Ver imagen ${i + 1}"><img src="${esc(cdnImage(u, 128, 70))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${esc(u)}'"></button>`
       ).join('')}</div>`
     : '';
+  const cartSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>';
 
   // SEO: JSON-LD de producto (la Edge es la variante orientada a velocidad/SEO).
   const jsonLd = {
@@ -765,17 +835,27 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   // otras paginas (portada u otras fichas).
   const productMap = buildProductMap(products && products.length ? products : [product]);
 
+  // Galería: sincroniza dots/thumbs con el scroll-snap (requestAnimationFrame
+  // como ProductGallery.jsx para evitar forced reflow). Sin dependencias.
   const galleryScript = [
-    'document.addEventListener("click",function(e){',
-    '  var t=e.target; if(!t || !t.closest) return;',
-    '  var th=t.closest(".pp-thumbs img"); if(!th) return;',
-    '  var m=document.getElementById("ppMain"); if(!m) return;',
-    '  m.onerror=function(){m.onerror=null;m.src=th.getAttribute("data-orig")||th.src;};',
-    '  m.src=th.getAttribute("data-full")||th.src;',
-    '  var all=document.querySelectorAll(".pp-thumbs img");',
-    '  for(var i=0;i<all.length;i++){all[i].classList.remove("active");}',
-    '  th.classList.add("active");',
-    '});',
+    '(function(){',
+    '  var tr=document.getElementById("ppgTrack"); if(!tr) return;',
+    '  var dots=document.querySelectorAll("#ppgDots button");',
+    '  var ths=document.querySelectorAll("#ppgThumbs button");',
+    '  function setOn(i){',
+    '    var k;for(k=0;k<dots.length;k++){dots[k].classList.toggle("on",k===i);}',
+    '    for(k=0;k<ths.length;k++){ths[k].classList.toggle("on",k===i);}',
+    '  }',
+    '  tr.addEventListener("scroll",function(){',
+    '    window.requestAnimationFrame(function(){',
+    '      if(!tr.offsetWidth) return;',
+    '      setOn(Math.round(tr.scrollLeft/tr.offsetWidth));',
+    '    });',
+    '  });',
+    '  function go(i){tr.scrollTo({left:tr.offsetWidth*i,behavior:"smooth"});setOn(i);}',
+    '  function bind(list){var k;for(k=0;k<list.length;k++){(function(i){list[i].addEventListener("click",function(){go(i);});})(k);}}',
+    '  bind(dots);bind(ths);',
+    '})();',
   ].join('\n');
 
   return `<!doctype html>
@@ -792,26 +872,33 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   <style>${criticalCss(theme)}</style>
   <script type="application/ld+json">${safeJson(jsonLd)}</script>
 </head>
-<body>
+<body class="pp-page">
   <nav class="pp-top">
     <a href="../../">← Volver a ${esc(storeName)}</a>
   </nav>
-  <main class="pp">
-    <section class="pp-gallery">
-      ${mainTag}
-      ${thumbs}
-    </section>
-    <section class="pp-info">
-      <h1>${esc(product.name)}</h1>
-      ${ratingHtml}
-      <div class="pp-prices">
-        <span class="pp-price">${esc(price)}</span>
-        ${compare ? `<span class="pp-compare">${esc(compare)}</span>` : ''}
-        ${pct > 0 ? `<span class="pp-badge">-${pct}%</span>` : ''}
-      </div>
-      <button class="pp-buy" type="button" data-buy="${esc(product.id)}">Comprar — pago contra entrega</button>
-      ${descHtml ? `<div class="pp-desc">${descHtml}</div>` : ''}
-    </section>
+  <main class="pp-wrap">
+    <div class="pp2">
+      <section class="ppg">
+        <div class="ppg-stage">
+          <div class="ppg-track" id="ppgTrack">${slides}</div>
+          ${dots}
+        </div>
+        ${thumbs}
+      </section>
+      <section class="pp-info pp-info2">
+        <h1>${esc(product.name)}</h1>
+        ${ratingHtml}
+        <div class="pp-prices2">
+          <span class="pp-price2">${esc(price)}</span>
+          ${showDiscountBadge && compare ? `<span class="pp-compare2">${esc(compare)}</span><span class="pp-save">Ahorra ${esc(savings)}</span>` : ''}
+        </div>
+        <div class="pp-bens">
+          ${benefits.map((b) => `<div><span>${esc((b && b.icon) || '')}</span><span>${esc((b && b.text) || '')}</span></div>`).join('')}
+        </div>
+        <button class="pp-cta" type="button" data-buy="${esc(product.id)}" style="${ctaStyle}">${cartSvg}${esc(ctaText)}</button>
+      </section>
+    </div>
+    ${descHtml ? `<div class="pp-desc2">${descHtml}</div>` : ''}
   </main>
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
