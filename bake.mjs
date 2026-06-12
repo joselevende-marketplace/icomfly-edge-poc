@@ -30,6 +30,10 @@ const slug = (process.argv[2] || 'joselevende').trim();
 // subdominio pero la config se busca por el slug real. Default: el mismo arg.
 const configSlug = (process.env.CONFIG_SLUG || slug).trim();
 const PRODUCT_LIMIT = Number(process.env.PRODUCT_LIMIT || 40);
+// Las FICHAS (producto/<id>/) se hornean para TODO el catalogo activo, no solo
+// el grid del home: el boton "Ver producto en tienda" del admin enlaza al
+// dominio propio por id y un producto viejo fuera del top-40 daba 404.
+const FICHA_LIMIT = Number(process.env.FICHA_LIMIT || 500);
 
 function log(msg) {
   console.log(`[bake] ${msg}`);
@@ -93,11 +97,14 @@ async function main() {
   // 2. Productos: por override o por el id resuelto del config
   const productsStoreId = overrideId || store.id;
   log(`Tienda: "${store.name}" (productos de store_id=${productsStoreId}, ${store.currency})`);
-  const products = await fetchJson(
-    `${API_BASE}/public/products?store_id=${productsStoreId}&limit=${PRODUCT_LIMIT}`,
+  const allProducts = await fetchJson(
+    `${API_BASE}/public/products?store_id=${productsStoreId}&limit=${Math.max(FICHA_LIMIT, PRODUCT_LIMIT)}`,
     'products'
   );
-  log(`Productos recibidos: ${Array.isArray(products) ? products.length : 0}`);
+  // El grid del home (y los "relacionados" de cada ficha) se mantienen en
+  // PRODUCT_LIMIT para no engordar el index.html; las fichas usan allProducts.
+  const products = Array.isArray(allProducts) ? allProducts.slice(0, PRODUCT_LIMIT) : [];
+  log(`Productos recibidos: ${Array.isArray(allProducts) ? allProducts.length : 0} (grid home: ${products.length})`);
 
   // 3. Hornear el HTML (cero llamadas al backend en runtime del cliente)
   const bakedAt = new Date().toISOString();
@@ -116,7 +123,7 @@ async function main() {
   //    poder registrar en el los ids realmente horneados (product_ids).
   let productPages = 0;
   const bakedProductIds = [];
-  for (const p of (Array.isArray(products) ? products : [])) {
+  for (const p of (Array.isArray(allProducts) ? allProducts : [])) {
     if (!p || p.id == null) continue;
     try {
       const pHtml = renderProductPage({ store, product: p, products, bakedAt });
@@ -143,7 +150,7 @@ async function main() {
         config_slug: configSlug, // slug real de la tienda en iComfly
         store_id: productsStoreId,
         store_name: store.name,
-        products: Array.isArray(products) ? products.length : 0,
+        products: Array.isArray(allProducts) ? allProducts.length : 0,
         product_ids: bakedProductIds, // ids con ficha horneada (producto/<id>/)
         bytes_html: Buffer.byteLength(html, 'utf8'),
         baked_at: bakedAt,
