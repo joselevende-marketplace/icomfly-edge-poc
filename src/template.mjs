@@ -77,11 +77,23 @@ function cdnImage(src, w = 440, q = 75) {
 // No toca SVGs ni otros origenes, ni envuelve dos veces. Gated por IMAGE_CDN.
 function optimizeHtmlImages(html) {
   if (!IMAGE_CDN_ENABLED || typeof html !== 'string') return html;
-  return html.replace(/https?:\/\/(?:cdn\.shopify\.com|pub-[a-z0-9]+\.r2\.dev)\/[^\s"')]+/gi, (url) => {
+  let out = html.replace(/https?:\/\/(?:cdn\.shopify\.com|pub-[a-z0-9]+\.r2\.dev)\/[^\s"')]+/gi, (url) => {
     if (url.includes('/cdn-cgi/')) return url;               // ya optimizada
     if (!/\.(?:jpe?g|png|webp)(?:$|\?)/i.test(url)) return url; // solo raster
     return `https://myicomfly.com/cdn-cgi/image/width=1000,quality=75,format=auto/${url}`;
   });
+  // Fallback onerror (igual que la galeria): si el resizer de Cloudflare falla
+  // (p.ej. el origen le niega el fetch -> 403/9408), el <img> vuelve a la URL
+  // original y la imagen se ve igual, solo sin optimizar. Sin esto, una falla
+  // del resizer deja iconos rotos en descripcion/pagina personalizada.
+  out = out.replace(/<img\b[^>]*>/gi, (tag) => {
+    if (/\bonerror=/i.test(tag)) return tag;
+    const m = tag.match(/\bsrc="https:\/\/myicomfly\.com\/cdn-cgi\/image\/[^"/]+\/(https?:\/\/[^"]+)"/i);
+    if (!m) return tag;
+    const orig = m[1].replace(/'/g, '%27');
+    return tag.replace(/^<img\b/i, `<img onerror="this.onerror=null;this.src='${orig}'"`);
+  });
+  return out;
 }
 
 // --- Render de una tarjeta de producto ---
