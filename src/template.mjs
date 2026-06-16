@@ -769,6 +769,22 @@ ${cartShellHtml(store)}
 // llamadas al backend para mostrarse. El carrito es el MISMO (localStorage del
 // dominio), asi que agregar desde la ficha y volver a la portada conserva todo.
 
+// Bloques "Diseno libre" (estilo Canva) POR PRODUCTO: lienzos free_canvas que el
+// dueño ubica arriba/abajo de la ficha (placement product_top/product_bottom),
+// guardados en product_page_customizations.sections_json.blocks y resueltos en
+// product.page_customization por /api/public/products. El HTML ya viene
+// pre-renderizado y con CSS acotado desde el admin (renderSectionHtml): aqui solo
+// se inyecta. Aditivo y fail-safe: sin bloques devuelve '' (ficha igual que hoy).
+function renderProductBlocks(product, placement) {
+  const pc = (product && typeof product.page_customization === 'object') ? product.page_customization : null;
+  const blocks = (pc && Array.isArray(pc.blocks)) ? pc.blocks : [];
+  return blocks
+    .filter((b) => b && b.enabled !== false && b.placement === placement && typeof b.html === 'string' && b.html)
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+    .map((b) => `<div class="pp-freeblock" style="margin:18px 0">${b.html}</div>`)
+    .join('\n');
+}
+
 export function renderProductPage({ store, product, products, bakedAt }) {
   const theme = store.theme_config || {};
   const storeName = store.name || 'Tienda';
@@ -811,6 +827,10 @@ export function renderProductPage({ store, product, products, bakedAt }) {
 
   const descHtml = sanitizeDescription(product.description || '');
   const metaDesc = plainText(product.description || '', 160) || `${product.name} en ${storeName}`;
+
+  // Lienzos "Diseno libre" propios de ESTE producto (arriba/abajo de la ficha).
+  const blocksTop = renderProductBlocks(product, 'product_top');
+  const blocksBottom = renderProductBlocks(product, 'product_bottom');
 
   // Galería con swipe (scroll-snap) + dots + thumbnails desktop, espejo de
   // src/components/product/ProductGallery.jsx.
@@ -894,6 +914,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
     <a href="../../">← Volver a ${esc(storeName)}</a>
   </nav>
   <main class="pp-wrap">
+    ${blocksTop}
     <div class="pp2">
       <section class="ppg">
         <div class="ppg-stage">
@@ -916,6 +937,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
       </section>
     </div>
     ${descHtml ? `<div class="pp-desc2">${descHtml}</div>` : ''}
+    ${blocksBottom}
   </main>
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
