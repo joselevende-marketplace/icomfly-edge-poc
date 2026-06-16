@@ -914,6 +914,13 @@ export function renderProductPage({ store, product, products, bakedAt }) {
     </div>`
     : '';
 
+  // En modo página completa, un botón "Comprar" del lienzo (href #comprar/#buy)
+  // dispara la compra REAL reusando el botón de la barra flotante (data-buy).
+  // Delegado en document → funciona sin importar cuándo se monte el elemento.
+  const fullPageBuyScript = fullPage
+    ? `<script>(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href*="#comprar"],a[href*="#buy"]');if(!a)return;e.preventDefault();var b=document.querySelector('.pp-buybar [data-buy]');if(b){b.click();}},true);})();</script>`
+    : '';
+
   let mainInner;
   if (fullPage) {
     mainInner = `${fullPage.html}<div style="height:96px" aria-hidden="true"></div>`;
@@ -972,6 +979,7 @@ ${cartShellHtml(store)}
 
   ${runtimeScripts(storeJs, productMap)}
   <script>${galleryScript}</script>
+  ${fullPageBuyScript}
 </body>
 </html>`;
 }
