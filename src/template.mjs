@@ -895,26 +895,30 @@ export function renderProductPage({ store, product, products, bakedAt }) {
     '})();',
   ].join('\n');
 
-  return `<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${esc(product.name)} — ${esc(storeName)}</title>
-  <meta name="description" content="${esc(metaDesc)}">
-  <meta property="og:title" content="${esc(product.name)}">
-  <meta property="og:type" content="product">
-  ${mainImg ? `<meta property="og:image" content="${esc(mainImg)}">` : ''}
-  ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
-  <style>${criticalCss(theme)}</style>
-  <script type="application/ld+json">${safeJson(jsonLd)}</script>
-</head>
-<body class="pp-page">
-  <nav class="pp-top">
-    <a href="../../">← Volver a ${esc(storeName)}</a>
-  </nav>
-  <main class="pp-wrap">
-    ${blocksTop}
+  // Diseño libre de PÁGINA COMPLETA por producto: si está activo, su lienzo
+  // REEMPLAZA la ficha estándar (galería/precio/botón/descripción). Se conserva
+  // el <head> (SEO/JSON-LD) y SIEMPRE se añade una barra de compra flotante + el
+  // carrito, así la venta nunca depende del diseño. Lee de page_customization
+  // directo (no del cfg) para no depender del merge per-product.
+  const pageCust = (product && typeof product.page_customization === 'object') ? product.page_customization : null;
+  const fullPage = (pageCust && pageCust.fullPage && pageCust.fullPage.enabled !== false
+    && typeof pageCust.fullPage.html === 'string' && pageCust.fullPage.html) ? pageCust.fullPage : null;
+
+  const buyBar = fullPage
+    ? `<div class="pp-buybar" style="position:fixed;left:0;right:0;bottom:0;z-index:45;background:#fff;box-shadow:0 -4px 20px rgba(0,0,0,.14);padding:10px 14px;display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;line-height:1.05">
+        <span style="font-weight:800;font-size:18px;color:#111">${esc(price)}</span>
+        ${showDiscountBadge && compare ? `<span style="font-size:12px;color:#888;text-decoration:line-through">${esc(compare)}</span>` : ''}
+      </div>
+      <button class="pp-cta" type="button" data-buy="${esc(product.id)}" style="${ctaStyle}">${cartSvg}${esc(ctaText)}</button>
+    </div>`
+    : '';
+
+  let mainInner;
+  if (fullPage) {
+    mainInner = `${fullPage.html}<div style="height:96px" aria-hidden="true"></div>`;
+  } else {
+    mainInner = `${blocksTop}
     <div class="pp2">
       <section class="ppg">
         <div class="ppg-stage">
@@ -937,8 +941,31 @@ export function renderProductPage({ store, product, products, bakedAt }) {
       </section>
     </div>
     ${descHtml ? `<div class="pp-desc2">${descHtml}</div>` : ''}
-    ${blocksBottom}
+    ${blocksBottom}`;
+  }
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${esc(product.name)} — ${esc(storeName)}</title>
+  <meta name="description" content="${esc(metaDesc)}">
+  <meta property="og:title" content="${esc(product.name)}">
+  <meta property="og:type" content="product">
+  ${mainImg ? `<meta property="og:image" content="${esc(mainImg)}">` : ''}
+  ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
+  <style>${criticalCss(theme)}</style>
+  <script type="application/ld+json">${safeJson(jsonLd)}</script>
+</head>
+<body class="pp-page">
+  <nav class="pp-top">
+    <a href="../../">← Volver a ${esc(storeName)}</a>
+  </nav>
+  <main class="pp-wrap"${fullPage ? ' style="max-width:none;padding:0"' : ''}>
+    ${mainInner}
   </main>
+  ${buyBar}
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
 ${cartShellHtml(store)}
