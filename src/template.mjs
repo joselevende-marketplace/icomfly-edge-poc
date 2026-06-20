@@ -393,8 +393,14 @@ function hydrationScript() {
     '    var name=fieldVal("coName"),last=fieldVal("coLast"),phone=fieldVal("coPhone"),dept=fieldVal("coDept"),city=fieldVal("coCity"),addr=fieldVal("coAddr"),hood=fieldVal("coHood"),mail=fieldVal("coMail");',
     '    var digits=phone.replace(/\\D/g,"");',
     '    var ok=true;',
+    // merge nombre+apellido: si el input #coLast no existe, el dueno unio los campos.
+    '    var merged=!document.getElementById("coLast");',
+    // Campos personalizados: se recolectan del DOM (data-cf), se valida required y
+    // sus valores se anexan a la direccion como ", Etiqueta: valor".
+    '    var cfEls=document.querySelectorAll("#coForm [data-cf]");var cfSuffix="";',
+    '    for(var ci=0;ci<cfEls.length;ci++){var ce=cfEls[ci];var cv=String(ce.value||"").replace(/^\\s+|\\s+$/g,"");var creq=ce.getAttribute("data-required")==="1";ce.classList.toggle("bad",creq&&!cv);if(creq&&!cv){ok=false;}var cl=ce.getAttribute("data-cflabel")||"";if(cv){cfSuffix+=", "+(cl?cl+": ":"")+cv;}}',
     '    markBad("coName",!name); if(!name){ok=false;}',
-    '    markBad("coLast",!last); if(!last){ok=false;}',
+    '    if(!merged){markBad("coLast",!last); if(!last){ok=false;}}',
     '    markBad("coPhone",digits.length<7); if(digits.length<7){ok=false;}',
     '    markBad("coDept",!dept); if(!dept){ok=false;}',
     '    markBad("coCity",!city); if(!city){ok=false;}',
@@ -416,7 +422,7 @@ function hydrationScript() {
     '      product:{id:pid,name:p.name,price:tot},',
     '      products:[{id:pid,name:p.name,price:unit,originalPrice:p.price,quantity:o.q,offerApplied:(o.d?{title:o.t,quantityReq:o.q,discount:o.d}:null),image:p.image||null}],',
     '      quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",',
-    '      customer:{fullName:(name+" "+last),phone:phone,whatsapp:phone,address:(addr+", "+hood),department:dept,city:city,email:mail},',
+    '      customer:{fullName:(merged?name:(name+" "+last)).replace(/\\s+/g," ").replace(/^\\s+|\\s+$/g,""),phone:phone,whatsapp:phone,address:(addr+", "+hood+cfSuffix),department:dept,city:city,email:mail},',
     '      quantityOfferApplied:!!o.d,quantityOfferTitle:(o.d?o.t:null),quantityOfferDiscount:(o.d||null),',
     '      isCartOrder:true,itemsCount:1,source:"edge_storefront"};',
     '    var resumen=(o.q+"x "+p.name);var totalTxt=fmt(tot);',
@@ -586,6 +592,35 @@ function cartShellHtml(store) {
   const lblDireccion = esc(L.direccion || 'Dirección de residencia');
   const lblBarrio = esc(L.barrio || 'Nombre Barrio - Número casa o Apto');
   const lblCorreo = esc(L.correo || 'Correo electrónico');
+  const lblFullName = esc(cfg.fullNameLabel || 'Nombre y Apellido');
+
+  // Unir Nombre + Apellido en una sola casilla (cfg.mergeName). Sin merge =
+  // exactamente los dos campos actuales (cero regresion). La hidratacion detecta
+  // el merge por AUSENCIA del input #coLast (ver hydrationScript).
+  const nameFields = cfg.mergeName
+    ? `<label for="coName">${lblFullName} <i>*</i></label>
+        <input id="coName" type="text" autocomplete="name" placeholder="${lblFullName}">`
+    : `<label for="coName">${lblNombre} <i>*</i></label>
+        <input id="coName" type="text" autocomplete="given-name" placeholder="${lblNombre}">
+        <label for="coLast">${lblApellido} <i>*</i></label>
+        <input id="coLast" type="text" autocomplete="family-name" placeholder="${lblApellido}">`;
+
+  // Campos personalizados (cfg.customFields). Se renderizan tras el barrio; sus
+  // valores se anexan a la direccion en la hidratacion. data-cf marca el input,
+  // data-cflabel su etiqueta y data-required si es obligatorio. Sin customFields
+  // no se emite nada (HTML identico al actual).
+  const customFieldsHtml = (Array.isArray(cfg.customFields) ? cfg.customFields : [])
+    .filter((f) => f && String(f.label || '').trim())
+    .map((f) => {
+      const lbl = esc(String(f.label).trim());
+      const ph = esc(String(f.placeholder || '').trim() || String(f.label).trim());
+      const req = f.required === true;
+      const star = req ? ' <i>*</i>' : '';
+      const fid = 'cf_' + String(f.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      return `<label for="${fid}">${lbl}${star}</label>
+        <input id="${fid}" data-cf="1" data-cflabel="${lbl}" data-required="${req ? '1' : '0'}" type="text" placeholder="${ph}">`;
+    })
+    .join('\n        ');
 
   const deptField = isCO
     ? `<select id="coDept"><option value="">${lblDepto}</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
@@ -612,10 +647,7 @@ function cartShellHtml(store) {
       </div>
       <div class="co-head">${subtitle}</div>
       <form id="coForm" novalidate>
-        <label for="coName">${lblNombre} <i>*</i></label>
-        <input id="coName" type="text" autocomplete="given-name" placeholder="${lblNombre}">
-        <label for="coLast">${lblApellido} <i>*</i></label>
-        <input id="coLast" type="text" autocomplete="family-name" placeholder="${lblApellido}">
+        ${nameFields}
         <label for="coPhone">${lblWhatsapp} <i>*</i></label>
         <input id="coPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="${lblWhatsapp}">
         <label for="coDept">${lblDepto} <i>*</i></label>
@@ -626,6 +658,7 @@ function cartShellHtml(store) {
         <input id="coAddr" type="text" autocomplete="street-address" placeholder="Dirección detallada (OBLIGATORIO)">
         <label for="coHood">${lblBarrio} <i>*</i></label>
         <input id="coHood" type="text" placeholder="Barrio/Conjunto/Torre/#Apto/#Casa">
+        ${customFieldsHtml}
         ${mailField}
         <div id="coError" class="co-error" style="display:none"></div>
         <button id="coSubmit" class="finish" type="submit">${ctaText}</button>
@@ -772,7 +805,7 @@ export function renderStorePage({ store, products, bakedAt }) {
   <meta name="description" content="${esc(store.description || title)}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:type" content="website">
-  ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
+  ${(theme.favicon_url || store.logo_url) ? `<link rel="icon" href="${esc(theme.favicon_url || store.logo_url)}">` : ''}
   <style>${criticalCss(theme)}</style>
   ${fbPixelHead(store)}
 </head>
@@ -992,7 +1025,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   <meta property="og:title" content="${esc(product.name)}">
   <meta property="og:type" content="product">
   ${mainImg ? `<meta property="og:image" content="${esc(mainImg)}">` : ''}
-  ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
+  ${(theme.favicon_url || store.logo_url) ? `<link rel="icon" href="${esc(theme.favicon_url || store.logo_url)}">` : ''}
   <link rel="canonical" href="../${esc(productPath(product))}/">
   <style>${criticalCss(theme)}</style>
   <script type="application/ld+json">${safeJson(jsonLd)}</script>
