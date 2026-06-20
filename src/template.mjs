@@ -11,6 +11,9 @@
  * Sin frameworks. Sin dependencias. Cero llamadas al backend para mostrar la pagina.
  */
 
+// Geo-datos por pais (listas buscables del formulario de venta). Worker-safe.
+import { geoForCountry } from './geoData.mjs';
+
 // --- Helpers de seguridad/formato ---
 
 function esc(value) {
@@ -542,7 +545,22 @@ function hydrationScript() {
     '    else if(t.closest("#coBack")){close();}',
     '    else if(t.closest("#doneClose")){close();}',
     '  });',
-    '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);}',
+    // Listas geo (datalist de ciudad filtrado por el depto elegido). Si no hay
+    // S.geo (pais sin datos) o faltan los inputs/datalist, no hace NADA: el
+    // formulario queda como hoy (cero regresion). Rellena ciudad con TODAS las
+    // del pais al inicio (buscable) y la acota al depto cuando este coincide.
+    '  function geoFill(){',
+    '    var G=S.geo; if(!G||!G.tree){return;}',
+    '    var dep=document.getElementById("coDept"),cl=document.getElementById("coCityList");',
+    '    if(!dep||!cl){return;}',
+    '    function nrm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/^\\s+|\\s+$/g,"");}',
+    '    var keys=Object.keys(G.tree),ALL=[];for(var i=0;i<keys.length;i++){var a=G.tree[keys[i]];if(a&&a.length){for(var j=0;j<a.length;j++){ALL.push(a[j]);}}}',
+    '    function setCities(arr){var h="";for(var i=0;i<arr.length;i++){h+="<option value=\\""+String(arr[i]).replace(/"/g,"&quot;")+"\\"></option>";}cl.innerHTML=h;}',
+    '    var lastKey=null;',
+    '    function refresh(){var v=nrm(dep.value),hit=null,hk=null;for(var i=0;i<keys.length;i++){if(nrm(keys[i])===v){hit=G.tree[keys[i]];hk=keys[i];break;}}var key=hk||"__all__";if(key===lastKey){return;}lastKey=key;setCities(hit||ALL);}',
+    '    dep.addEventListener("input",refresh); dep.addEventListener("change",refresh); refresh();',
+    '  }',
+    '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);} geoFill();',
     '})();',
   ].join('\n');
 }
@@ -583,6 +601,7 @@ function buildStoreJs(store) {
     // Texto base del CTA: la hidratacion lo re-pinta con el total
     // (S.ctaText + ' - ' + fmt(tot)). Configurable via checkout_form.ctaText.
     ctaText: String(checkoutCfg(store).ctaText || CTA_DEFAULT),
+    geo: geoForCountry((store && store.country) || 'Colombia'),
   };
 }
 
@@ -658,14 +677,16 @@ function cartShellHtml(store) {
   // textos del dueño pasan por esc(); defaults = look actual (cero regresion).
   const cfg = checkoutCfg(store);
   const L = cfg.labels || {};
+  // Geo del pais (null si no hay datos -> texto libre actual).
+  const geo = geoForCountry((store && store.country) || 'Colombia');
   const title = esc(cfg.title || 'Ordena ya y paga al recibir');
   const subtitle = esc(cfg.subtitle || 'Ingresa los datos de envío');
   const ctaText = esc(cfg.ctaText || CTA_DEFAULT);
   const lblNombre = esc(L.nombre || 'Nombre');
   const lblApellido = esc(L.apellido || 'Apellido');
   const lblWhatsapp = esc(L.whatsapp || 'Whatsapp / Celular');
-  const lblDepto = esc(L.departamento || 'Departamento');
-  const lblCiudad = esc(L.ciudad || 'Ciudad');
+  const lblDepto = esc(L.departamento || (geo ? geo.levels[0] : 'Departamento'));
+  const lblCiudad = esc(L.ciudad || (geo ? geo.levels[1] : 'Ciudad'));
   const lblDireccion = esc(L.direccion || 'Dirección de residencia');
   const lblBarrio = esc(L.barrio || 'Nombre Barrio - Número casa o Apto');
   const lblCorreo = esc(L.correo || 'Correo electrónico');
@@ -699,9 +720,19 @@ function cartShellHtml(store) {
     })
     .join('\n        ');
 
-  const deptField = isCO
-    ? `<select id="coDept"><option value="">${lblDepto}</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
-    : `<input id="coDept" type="text" placeholder="${lblDepto} / Provincia">`;
+  // Opciones <datalist>: el cliente ESCRIBE y filtra, y tambien puede teclear un
+  // valor fuera de la lista (datalist no obliga). Cero JS fragil en el render.
+  const geoOpt = (v) => `<option value="${esc(v)}"></option>`;
+  const deptField = geo
+    ? `<input id="coDept" type="text" list="coDeptList" autocomplete="off" placeholder="${lblDepto}"><datalist id="coDeptList">${Object.keys(geo.tree).map(geoOpt).join('')}</datalist>`
+    : (isCO
+      ? `<select id="coDept"><option value="">${lblDepto}</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
+      : `<input id="coDept" type="text" placeholder="${lblDepto} / Provincia">`);
+  // Ciudad: con geo es <input list>; su <datalist> lo rellena la hidratacion
+  // (geoFill) con las ciudades del depto elegido. Sin geo, el input de hoy.
+  const cityField = geo
+    ? `<input id="coCity" type="text" list="coCityList" autocomplete="off" placeholder="${lblCiudad}"><datalist id="coCityList"></datalist>`
+    : `<input id="coCity" type="text" autocomplete="address-level2" placeholder="${lblCiudad}">`;
 
   // Campo correo: opcional en el pedido; si showEmail === false NO se emite.
   // La hidratacion lo tolera: fieldVal() devuelve '' cuando el id no existe.
@@ -730,7 +761,7 @@ function cartShellHtml(store) {
         <label for="coDept">${lblDepto} <i>*</i></label>
         ${deptField}
         <label for="coCity">${lblCiudad} <i>*</i></label>
-        <input id="coCity" type="text" autocomplete="address-level2" placeholder="${lblCiudad}">
+        ${cityField}
         <label for="coAddr">${lblDireccion} <i>*</i></label>
         <input id="coAddr" type="text" autocomplete="street-address" placeholder="Dirección detallada (OBLIGATORIO)">
         <label for="coHood">${lblBarrio} <i>*</i></label>
