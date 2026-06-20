@@ -370,6 +370,9 @@ function criticalCss(theme) {
     .pp-chrome-act{justify-self:end;display:flex;align-items:center;gap:8px}
     .pp-cart{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;background:none;color:var(--text);cursor:pointer;border-radius:10px}
     .pp-cart:hover{background:#f1f3f7}
+    /* CELULAR (<880px, donde el menu ya esta oculto): logo centrado y SIN carrito.
+       Aditivo: solo aplica en mobile; el header desktop (>=880px) no cambia. */
+    @media(max-width:879px){.pp-chrome-nav{grid-template-columns:1fr}.pp-chrome-act{display:none}.pp-logo{justify-self:center}}
     .pp-foot{margin-top:48px;background:#0f172a;color:#cbd5e1;padding:30px 16px;text-align:center}
     .pp-foot-links{display:flex;flex-wrap:wrap;gap:12px 22px;justify-content:center;margin-bottom:14px}
     .pp-foot-links a{color:inherit;text-decoration:none;font-weight:600;font-size:.9rem;opacity:.92}
