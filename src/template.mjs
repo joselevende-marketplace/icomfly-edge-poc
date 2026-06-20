@@ -372,6 +372,42 @@ function criticalCss(theme) {
       body.pp-chrome-on .pp2{grid-template-columns:1.1fr .9fr;gap:48px}
       body.pp-chrome-on .pp-info2{position:sticky;top:88px}
     }
+    .rv-wrap{max-width:896px;margin:48px auto 0;padding:0 16px}
+    .rv-title{font-size:1.6rem;font-weight:800;text-align:center;margin:0 0 20px;color:var(--text)}
+    .rv-box{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px}
+    .rv-stars{color:#f59e0b;letter-spacing:1px;line-height:1;white-space:nowrap}
+    .rv-stars .rv-off{color:#d1d5db}
+    .rv-lg{font-size:1.6rem}.rv-sm{font-size:1rem}
+    .rv-ov{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
+    .rv-avg{text-align:center}
+    .rv-avgn{font-size:2rem;font-weight:800;margin-top:6px;color:var(--text)}
+    .rv-sub{color:#6b7280;font-size:.9rem;margin-top:2px}
+    .rv-dist{display:flex;flex-direction:column;gap:8px}
+    .rv-brow{display:flex;align-items:center;gap:10px}
+    .rv-bar{flex:1;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden}
+    .rv-bar>span{display:block;height:100%;background:#108EE3;border-radius:6px}
+    .rv-bn{width:28px;text-align:right;font-size:.85rem;font-weight:600;color:#374151}
+    .rv-empty{text-align:center;padding:16px 0}
+    .rv-empty p{color:#6b7280;margin:10px 0 0}
+    .rv-actions{text-align:center;margin-top:18px}
+    .rv-btn{background:#108EE3;color:#fff;border:0;border-radius:8px;padding:12px 26px;font-weight:700;font-size:.95rem;cursor:pointer}
+    .rv-btn:hover{filter:brightness(1.05)}
+    .rv-btn:disabled{opacity:.6;cursor:default}
+    .rv-form{margin-top:20px;border-top:1px solid #eee;padding-top:18px;text-align:left}
+    .rv-lbl{display:block;font-size:.85rem;font-weight:600;margin:12px 0 6px;color:#374151}
+    .rv-pick span{font-size:1.8rem;color:#d1d5db;cursor:pointer;line-height:1}
+    .rv-pick span.on{color:#f59e0b}
+    .rv-in{width:100%;border:2px solid #e5e7eb;border-radius:8px;padding:10px 12px;font:inherit;box-sizing:border-box}
+    .rv-in:focus{outline:none;border-color:#108EE3}
+    .rv-msg{color:#dc2626;font-size:.85rem;min-height:18px;margin:8px 0}
+    .rv-list{display:flex;flex-direction:column;gap:16px}
+    .rv-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
+    .rv-ch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+    .rv-name{font-weight:700;color:var(--text)}
+    .rv-vf{background:#dcfce7;color:#166534;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px}
+    .rv-date{color:#9ca3af;font-size:.8rem;margin-left:auto}
+    .rv-cm{margin:6px 0 0;color:#374151;line-height:1.55;overflow-wrap:anywhere}
+    @media(max-width:640px){.rv-ov{grid-template-columns:1fr;gap:18px}}
   `.trim();
 }
 
@@ -1070,6 +1106,90 @@ export function renderProductPage({ store, product, products, bakedAt }) {
     ? `<script>(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[href*="#comprar"],a[href*="#buy"]');if(!a)return;e.preventDefault();var b=document.querySelector('.pp-buybar [data-buy]');if(b){b.click();}},true);})();</script>`
     : '';
 
+  // Reseñas (Neox-Fix #437): sección client-side, espejo de la SPA
+  // (ReviewsSection/ReviewModal). Lee /reviews/product/:id (público, active=true)
+  // y permite escribir vía POST (mismo CORS que el checkout). Arranca oculta y
+  // solo se muestra si el fetch responde; si falla, queda oculta (aditivo).
+  const reviewsScript = [
+    '(function(){',
+    '  var wrap=document.getElementById("rvWrap"); if(!wrap) return;',
+    '  var pid=wrap.getAttribute("data-pid"); if(!pid) return;',
+    '  var API="https://api.icomfly.com/api";',
+    '  function eh(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}',
+    '  function stars(n){n=Math.max(0,Math.min(5,Math.round(Number(n)||0)));var s="";for(var i=0;i<5;i++){s+=i<n?"★":`<span class="rv-off">★</span>`;}return s;}',
+    '  function fmtDate(d){try{return new Date(d).toLocaleDateString("es-CO",{day:"2-digit",month:"2-digit",year:"numeric"});}catch(e){return "";}}',
+    '  var headEl=document.getElementById("rvHead");',
+    '  var listEl=document.getElementById("rvList");',
+    '  var btn=document.getElementById("rvWriteBtn");',
+    '  var form=document.getElementById("rvForm");',
+    '  var data=[];',
+    '  function render(){',
+    '    var n=data.length,i;',
+    '    if(!n){',
+    '      headEl.innerHTML=`<div class="rv-empty"><div class="rv-stars rv-lg">${stars(0)}</div><p>Aún no hay reseñas para este producto.</p></div>`;',
+    '      listEl.innerHTML="";',
+    '      btn.textContent="Sé el primero en escribir una reseña";',
+    '      return;',
+    '    }',
+    '    var sum=0,dist={1:0,2:0,3:0,4:0,5:0};',
+    '    for(i=0;i<n;i++){var rr=Number(data[i].rating)||0;sum+=rr;if(dist[rr]!=null)dist[rr]++;}',
+    '    var avg=sum/n,bars="",s;',
+    '    for(s=5;s>=1;s--){var pc=n?Math.round(dist[s]/n*100):0;bars+=`<div class="rv-brow"><span class="rv-stars rv-sm">${stars(s)}</span><span class="rv-bar"><span style="width:${pc}%"></span></span><span class="rv-bn">${dist[s]}</span></div>`;}',
+    '    headEl.innerHTML=`<div class="rv-ov"><div class="rv-avg"><div class="rv-stars rv-lg">${stars(avg)}</div><div class="rv-avgn">${avg.toFixed(2)} de 5</div><div class="rv-sub">Basado en ${n} reseña${n===1?"":"s"} ✅</div></div><div class="rv-dist">${bars}</div></div>`;',
+    '    btn.textContent="Escribir una reseña";',
+    '    var h="";for(i=0;i<n;i++){var rv=data[i];h+=`<div class="rv-card"><div class="rv-ch"><span class="rv-name">${eh(rv.customer_name)}</span>${rv.verified_purchase?`<span class="rv-vf">Compra verificada</span>`:""}<span class="rv-date">${eh(fmtDate(rv.created_at))}</span></div><div class="rv-stars rv-sm">${stars(rv.rating)}</div>${rv.comment?`<p class="rv-cm">${eh(rv.comment)}</p>`:""}</div>`;}',
+    '    listEl.innerHTML=h;',
+    '  }',
+    '  function load(){',
+    '    fetch(API+"/reviews/product/"+encodeURIComponent(pid)).then(function(r){return r.json();}).then(function(res){',
+    '      data=(res&&res.data)?res.data:(Array.isArray(res)?res:[]);',
+    '      wrap.style.display="";render();',
+    '    }).catch(function(){wrap.style.display="none";});',
+    '  }',
+    '  btn.addEventListener("click",function(){var open=form.style.display==="block";form.style.display=open?"none":"block";if(!open){form.scrollIntoView({behavior:"smooth",block:"center"});}});',
+    '  var picked=0,sb=form.querySelectorAll(".rv-pick span");',
+    '  function paint(v){for(var k=0;k<sb.length;k++){sb[k].classList.toggle("on",k<v);}}',
+    '  for(var k=0;k<sb.length;k++){(function(idx){sb[idx].addEventListener("click",function(){picked=idx+1;paint(picked);});})(k);}',
+    '  form.querySelector(".rv-submit").addEventListener("click",function(){',
+    '    var name=form.querySelector("[name=name]").value.trim();',
+    '    var email=form.querySelector("[name=email]").value.trim();',
+    '    var comment=form.querySelector("[name=comment]").value.trim();',
+    '    var msg=form.querySelector(".rv-msg");',
+    '    if(!picked){msg.textContent="Selecciona una calificación.";return;}',
+    '    if(!name){msg.textContent="Ingresa tu nombre.";return;}',
+    '    if(!comment){msg.textContent="Escribe tu comentario.";return;}',
+    '    msg.textContent="";var sbtn=form.querySelector(".rv-submit"),old=sbtn.textContent;sbtn.disabled=true;sbtn.textContent="Enviando...";',
+    '    fetch(API+"/reviews/product/"+encodeURIComponent(pid),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customerName:name,customerEmail:email,rating:picked,comment:comment,images:[]})})',
+    '      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:null};});})',
+    '      .then(function(res){sbtn.disabled=false;sbtn.textContent=old;if(!res.ok||(res.j&&res.j.success===false)){msg.textContent=(res.j&&res.j.message)||"No pudimos publicar tu reseña.";return;}form.querySelector("[name=name]").value="";form.querySelector("[name=email]").value="";form.querySelector("[name=comment]").value="";picked=0;paint(0);form.style.display="none";load();})',
+    '      .catch(function(){sbtn.disabled=false;sbtn.textContent=old;msg.textContent="Error de conexión. Intenta de nuevo.";});',
+    '  });',
+    '  load();',
+    '})();',
+  ].join('\n');
+
+  const reviewsBlock = `<section class="rv-wrap" id="rvWrap" data-pid="${esc(product.id)}" style="display:none">
+    <h2 class="rv-title">Reseñas de Clientes</h2>
+    <div class="rv-box">
+      <div id="rvHead"></div>
+      <div class="rv-actions"><button type="button" id="rvWriteBtn" class="rv-btn">Escribir una reseña</button></div>
+      <div class="rv-form" id="rvForm" style="display:none">
+        <label class="rv-lbl">Calificación *</label>
+        <div class="rv-pick"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+        <label class="rv-lbl">Nombre *</label>
+        <input class="rv-in" name="name" type="text" maxlength="80">
+        <label class="rv-lbl">Email</label>
+        <input class="rv-in" name="email" type="email" maxlength="120">
+        <label class="rv-lbl">Comentario *</label>
+        <textarea class="rv-in" name="comment" rows="4" maxlength="1000" placeholder="Cuéntanos sobre tu experiencia con el producto..."></textarea>
+        <div class="rv-msg"></div>
+        <button type="button" class="rv-btn rv-submit">Publicar reseña</button>
+      </div>
+    </div>
+    <div id="rvList" class="rv-list"></div>
+  </section>
+  <script>${reviewsScript}</script>`;
+
   let mainInner;
   if (fullPage) {
     mainInner = `${fullPage.html}<div style="height:96px" aria-hidden="true"></div>`;
@@ -1133,6 +1253,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   </main>
   ${footerHtml}
   ${buyBar}
+  ${reviewsBlock}
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
 ${cartShellHtml(store)}
