@@ -235,6 +235,12 @@ function criticalCss(theme) {
     .co{overflow:auto;padding:14px 18px;display:block}
     .co label{font-size:.8rem;font-weight:700;color:var(--muted)}
     .co input{width:100%;padding:11px 12px;border:1px solid #d8dee8;border-radius:10px;margin:4px 0 12px;font-size:.95rem;font-family:inherit}
+    /* Combobox propio de ubicacion (depto/ciudad): UI de nuestro checkout */
+    .geo-wrap{position:relative;margin:4px 0 12px}
+    .geo-wrap input{margin:0}
+    .geo-dd{display:none;position:absolute;left:0;right:0;top:100%;margin-top:2px;z-index:60;background:#fff;border:1px solid #d8dee8;border-radius:10px;box-shadow:0 10px 24px rgba(16,24,40,.14);max-height:230px;overflow-y:auto}
+    .geo-dd button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;font:inherit;cursor:pointer;color:#1a1a1a}
+    .geo-dd button:hover{background:#eff6ff}
     .co input.bad{border-color:#e11d48}
     .co-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:.85rem;margin-bottom:10px}
     .co-submit{margin-top:2px}
@@ -544,22 +550,27 @@ function hydrationScript() {
     '    else if(t.closest("#coBack")){close();}',
     '    else if(t.closest("#doneClose")){close();}',
     '  });',
-    // Listas geo (datalist de ciudad filtrado por el depto elegido). Si no hay
-    // S.geo (pais sin datos) o faltan los inputs/datalist, no hace NADA: el
-    // formulario queda como hoy (cero regresion). Rellena ciudad con TODAS las
-    // del pais al inicio (buscable) y la acota al depto cuando este coincide.
-    '  function geoFill(){',
+    // Combobox propio de ubicacion: dropdown filtrable (.geo-dd) por depto/ciudad,
+    // la ciudad acotada al depto. Si no hay S.geo o faltan los nodos, no hace NADA
+    // (cero regresion). Es la UI de nuestro checkout (no el <datalist> del navegador).
+    '  function setupGeoCombos(){',
     '    var G=S.geo; if(!G||!G.tree){return;}',
-    '    var dep=document.getElementById("coDept"),cl=document.getElementById("coCityList");',
-    '    if(!dep||!cl){return;}',
     '    function nrm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/^\\s+|\\s+$/g,"");}',
+    '    function eg(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}',
     '    var keys=Object.keys(G.tree),ALL=[];for(var i=0;i<keys.length;i++){var a=G.tree[keys[i]];if(a&&a.length){for(var j=0;j<a.length;j++){ALL.push(a[j]);}}}',
-    '    function setCities(arr){var h="";for(var i=0;i<arr.length;i++){h+="<option value=\\""+String(arr[i]).replace(/"/g,"&quot;")+"\\"></option>";}cl.innerHTML=h;}',
-    '    var lastKey=null;',
-    '    function refresh(){var v=nrm(dep.value),hit=null,hk=null;for(var i=0;i<keys.length;i++){if(nrm(keys[i])===v){hit=G.tree[keys[i]];hk=keys[i];break;}}var key=hk||"__all__";if(key===lastKey){return;}lastKey=key;setCities(hit||ALL);}',
-    '    dep.addEventListener("input",refresh); dep.addEventListener("change",refresh); refresh();',
+    '    function citiesFor(dv){var v=nrm(dv);for(var i=0;i<keys.length;i++){if(nrm(keys[i])===v){return G.tree[keys[i]];}}return ALL;}',
+    '    function combo(inId,ddId,getOpts){',
+    '      var inp=document.getElementById(inId),dd=document.getElementById(ddId);if(!inp||!dd){return;}',
+    '      function render(){var v=nrm(inp.value),opts=getOpts(),out=[];for(var i=0;i<opts.length&&out.length<50;i++){if(!v||nrm(opts[i]).indexOf(v)>=0){out.push(opts[i]);}}if(!out.length){dd.style.display="none";return;}var h="";for(var k=0;k<out.length;k++){h+="<button type=\\"button\\" data-v=\\""+eg(out[k])+"\\">"+eg(out[k])+"</button>";}dd.innerHTML=h;dd.style.display="block";}',
+    '      inp.addEventListener("focus",render);',
+    '      inp.addEventListener("input",render);',
+    '      dd.addEventListener("mousedown",function(e){var b=e.target&&e.target.closest?e.target.closest("button[data-v]"):null;if(!b){return;}e.preventDefault();inp.value=b.getAttribute("data-v");dd.style.display="none";inp.classList.remove("bad");});',
+    '      inp.addEventListener("blur",function(){setTimeout(function(){dd.style.display="none";},150);});',
+    '    }',
+    '    combo("coDept","coDeptDD",function(){return keys;});',
+    '    combo("coCity","coCityDD",function(){var d=document.getElementById("coDept");return citiesFor(d?d.value:"");});',
     '  }',
-    '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);} geoFill();',
+    '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);} setupGeoCombos();',
     '})();',
   ].join('\n');
 }
@@ -719,18 +730,16 @@ function cartShellHtml(store) {
     })
     .join('\n        ');
 
-  // Opciones <datalist>: el cliente ESCRIBE y filtra, y tambien puede teclear un
-  // valor fuera de la lista (datalist no obliga). Cero JS fragil en el render.
-  const geoOpt = (v) => `<option value="${esc(v)}"></option>`;
+  // Combobox propio (UI de nuestro checkout): <input> + dropdown filtrable .geo-dd.
+  // El cliente ESCRIBE para filtrar y elige de la lista; la ciudad se acota al
+  // depto (setupGeoCombos en la hidratacion). Sin geo, los campos de hoy.
   const deptField = geo
-    ? `<input id="coDept" type="text" list="coDeptList" autocomplete="off" placeholder="${lblDepto}"><datalist id="coDeptList">${Object.keys(geo.tree).map(geoOpt).join('')}</datalist>`
+    ? `<div class="geo-wrap"><input id="coDept" type="text" autocomplete="off" placeholder="${lblDepto}"><div class="geo-dd" id="coDeptDD"></div></div>`
     : (isCO
       ? `<select id="coDept"><option value="">${lblDepto}</option>${DEPTS_CO.map((d) => `<option>${d}</option>`).join('')}</select>`
       : `<input id="coDept" type="text" placeholder="${lblDepto} / Provincia">`);
-  // Ciudad: con geo es <input list>; su <datalist> lo rellena la hidratacion
-  // (geoFill) con las ciudades del depto elegido. Sin geo, el input de hoy.
   const cityField = geo
-    ? `<input id="coCity" type="text" list="coCityList" autocomplete="off" placeholder="${lblCiudad}"><datalist id="coCityList"></datalist>`
+    ? `<div class="geo-wrap"><input id="coCity" type="text" autocomplete="off" placeholder="${lblCiudad}"><div class="geo-dd" id="coCityDD"></div></div>`
     : `<input id="coCity" type="text" autocomplete="address-level2" placeholder="${lblCiudad}">`;
 
   // Campo correo: opcional en el pedido; si showEmail === false NO se emite.
