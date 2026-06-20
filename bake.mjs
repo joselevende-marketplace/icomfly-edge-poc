@@ -90,6 +90,9 @@ async function main() {
     country: store.country || 'Colombia',
     web_page_html: store.web_page_html || '',
     web_sections: store.web_sections || [],
+    // Pixels de Facebook marcados "mostrar en la web" (toggle por pixel en Conexiones).
+    // Solo pixelId; el template inyecta fbq+PageView. Vacío = página igual que hoy.
+    web_pixels: Array.isArray(store.web_pixels) ? store.web_pixels : [],
     contact: { ...(store.contact || {}), whatsapp: process.env.WHATSAPP || (store.contact && store.contact.whatsapp) || store.whatsapp || '' },
     id: store.id,
   };

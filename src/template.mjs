@@ -682,6 +682,20 @@ function plainText(html, max = 160) {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
+// --- Facebook Pixel (PageView) ---
+// Inyecta el pixel SOLO para los pixels que la tienda marcó "mostrar en la web"
+// (toggle por pixel en Conexiones → llegan en store.web_pixels desde /store/config).
+// 100% aditivo y genérico por tienda: sin web_pixels devuelve '' y el <head> queda
+// byte-idéntico al de hoy. Los pixels de WhatsApp/CAPI NO se incluyen (van en OFF).
+function fbPixelHead(store) {
+  const ids = Array.isArray(store && store.web_pixels) ? store.web_pixels.filter(Boolean) : [];
+  if (ids.length === 0) return '';
+  const inits = ids.map((id) => `fbq('init',${JSON.stringify(String(id))});`).join('');
+  const firstId = encodeURIComponent(String(ids[0]));
+  return `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${inits}fbq('track','PageView');</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${firstId}&ev=PageView&noscript=1"/></noscript>`;
+}
+
 // --- Render de la pagina completa ---
 
 export function renderStorePage({ store, products, bakedAt }) {
@@ -749,6 +763,7 @@ export function renderStorePage({ store, products, bakedAt }) {
   <meta property="og:type" content="website">
   ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
   <style>${criticalCss(theme)}</style>
+  ${fbPixelHead(store)}
 </head>
 <body>
   ${heroHtml}
@@ -964,6 +979,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
   <style>${criticalCss(theme)}</style>
   <script type="application/ld+json">${safeJson(jsonLd)}</script>
+  ${fbPixelHead(store)}
 </head>
 <body class="pp-page">
   <nav class="pp-top">
