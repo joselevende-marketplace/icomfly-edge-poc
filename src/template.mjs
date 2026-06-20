@@ -364,7 +364,6 @@ function criticalCss(theme) {
     .pp-chrome-act{justify-self:end;display:flex;align-items:center;gap:8px}
     .pp-cart{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;background:none;color:var(--text);cursor:pointer;border-radius:10px}
     .pp-cart:hover{background:#f1f3f7}
-    .pp-pay{margin-top:14px;font-size:.78rem;color:var(--muted);text-align:center;line-height:1.5}
     .pp-foot{margin-top:48px;background:#0f172a;color:#cbd5e1;padding:30px 16px;text-align:center}
     .pp-foot-links{display:flex;flex-wrap:wrap;gap:12px 22px;justify-content:center;margin-bottom:14px}
     .pp-foot-links a{color:inherit;text-decoration:none;font-weight:600;font-size:.9rem;opacity:.92}
@@ -1070,9 +1069,6 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   // chrome.enabled !== true, chromeOn es false y la ficha se ve igual que hoy.
   const chrome = (cfg.chrome && typeof cfg.chrome === 'object') ? cfg.chrome : null;
   const chromeOn = !!(chrome && chrome.enabled === true);
-  const payRaw = chromeOn && typeof chrome.payments === 'string' ? chrome.payments.trim() : '';
-  const payText = chromeOn ? (payRaw || 'Pago contra entrega · Tarjeta · PSE · Addi · Nequi') : '';
-  const payHtml = payText ? `<div class="pp-pay">${esc(payText)}</div>` : '';
 
   // SEO: JSON-LD de producto (la Edge es la variante orientada a velocidad/SEO).
   const jsonLd = {
@@ -1262,7 +1258,6 @@ export function renderProductPage({ store, product, products, bakedAt }) {
           ${benefits.map((b) => `<div><span>${esc((b && b.icon) || '')}</span><span>${esc((b && b.text) || '')}</span></div>`).join('')}
         </div>
         <button class="pp-cta" type="button" data-buy="${esc(product.id)}" style="${ctaStyle}">${cartSvg}${esc(ctaText)}</button>
-        ${payHtml}
       </section>
     </div>
     ${descHtml ? `<div class="pp-desc2">${descHtml}</div>` : ''}
