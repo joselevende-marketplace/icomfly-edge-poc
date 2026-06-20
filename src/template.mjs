@@ -509,9 +509,13 @@ function hydrationScript() {
     // Sigue siendo "#"+digitos. Idempotencia intacta: una vez guardado se reutiliza.
     '    if(!att||/^#[0-9]{4,6}$/.test(att)){att="#"+Date.now()+Math.floor(Math.random()*100000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
     '    var body={orderNumber:att,',
-    '      product:{id:pid,name:p.name,price:tot},',
+    // price=unit (unitario con descuento) y quantity=o.q (cantidad real de la oferta)
+    // para que el pedido guarde la cantidad correcta del combo (antes quantity:1 +
+    // price:tot mostraba "1" en el panel). total sigue = tot = unit*o.q (consistente).
+    // En pedidos de 1 unidad es identico (o.q=1, unit=tot). No toca nombre/items/notas.
+    '      product:{id:pid,name:p.name,price:unit},',
     '      products:[{id:pid,name:p.name,price:unit,originalPrice:p.price,quantity:o.q,offerApplied:(o.d?{title:o.t,quantityReq:o.q,discount:o.d}:null),image:p.image||null}],',
-    '      quantity:1,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",',
+    '      quantity:o.q,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",',
     '      customer:{fullName:(merged?name:(name+" "+last)).replace(/\\s+/g," ").replace(/^\\s+|\\s+$/g,""),phone:phone,whatsapp:phone,address:(addr+", "+hood+cfSuffix),department:dept,city:city,email:mail},',
     '      quantityOfferApplied:!!o.d,quantityOfferTitle:(o.d?o.t:null),quantityOfferDiscount:(o.d||null),',
     '      isCartOrder:true,itemsCount:1,source:"edge_storefront"};',
