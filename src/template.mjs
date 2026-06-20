@@ -895,8 +895,13 @@ export function renderProductPage({ store, product, products, bakedAt }) {
 
   const storeJs = buildStoreJs(store);
   // Mapa COMPLETO de productos: el drawer muestra bien items agregados desde
-  // otras paginas (portada u otras fichas).
-  const productMap = buildProductMap(products && products.length ? products : [product]);
+  // otras paginas (portada u otras fichas). El catalogo que llega (products) es
+  // solo el grid del home (PRODUCT_LIMIT), pero las fichas se hornean para TODO
+  // el catalogo (FICHA_LIMIT): hay que GARANTIZAR que el producto de ESTA ficha
+  // este en el mapa, o su propio boton "data-buy" no abriria el checkout.
+  const baseList = products && products.length ? products : [product];
+  const hasCurrent = baseList.some((p) => p && String(p.id) === String(product.id));
+  const productMap = buildProductMap(hasCurrent ? baseList : baseList.concat([product]));
 
   // Galería: sincroniza dots/thumbs con el scroll-snap (requestAnimationFrame
   // como ProductGallery.jsx para evitar forced reflow). Sin dependencias.
