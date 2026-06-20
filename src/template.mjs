@@ -524,7 +524,11 @@ function hydrationScript() {
     '      quantity:o.q,subtotal:tot,shippingCost:0,total:tot,shippingOption:"standard",paymentMethod:"Contra Entrega",status:"Confirmado",',
     '      customer:{fullName:(merged?name:(name+" "+last)).replace(/\\s+/g," ").replace(/^\\s+|\\s+$/g,""),phone:phone,whatsapp:phone,address:(addr+", "+hood+cfSuffix),department:dept,city:city,email:mail},',
     '      quantityOfferApplied:!!o.d,quantityOfferTitle:(o.d?o.t:null),quantityOfferDiscount:(o.d||null),',
-    '      isCartOrder:true,itemsCount:1,source:"edge_storefront"};',
+    // isCartOrder:false -> el backend guarda el product_name PLANO (sin prefijo "Nx");
+    // la plantilla de WhatsApp pone la cantidad UNA sola vez (antes salia "3x 3x ...").
+    // order_items se sigue creando desde el array products. NO afecta el carrito
+    // multi-producto de la SPA (otro camino). Aditivo: solo pedidos del edge.
+    '      isCartOrder:false,itemsCount:1,source:"edge_storefront"};',
     '    var resumen=(o.q+"x "+p.name);var totalTxt=fmt(tot);',
     '    fetch(API+"/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})',
     '      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};}).catch(function(){return {ok:false,j:null};});})',
