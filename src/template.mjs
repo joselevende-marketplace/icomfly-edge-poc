@@ -869,6 +869,16 @@ export function renderStorePage({ store, products, bakedAt }) {
     ? ''
     : `<header class="hero"><h1>${esc(title)}</h1>${store.description ? `<p>${esc(store.description)}</p>` : ''}</header>`;
 
+  // Chrome del dominio propio (MISMA config que la ficha: theme_config.product_page.chrome)
+  // tambien en la PORTADA, para que el menu/barra de anuncio/logo sean consistentes.
+  // Aditivo y fail-safe: con chrome.enabled !== true, header/footer son ''. rootHref './'
+  // porque la portada vive en la raiz (la ficha esta en producto/<id>/ y usa '../../').
+  const cfg = (theme && typeof theme.product_page === 'object' && theme.product_page) || {};
+  const chrome = (cfg.chrome && typeof cfg.chrome === 'object') ? cfg.chrome : null;
+  const chromeOn = !!(chrome && chrome.enabled === true);
+  const headerHtml = chromeOn ? chromeHeaderHtml(store, chrome, null, './') : '';
+  const footerHtml = chromeOn ? chromeFooterHtml(store, chrome) : '';
+
   // Datos minimos para el carrito (id -> {name, price, image}) y la tienda.
   const productMap = buildProductMap(list);
   const storeJs = buildStoreJs(store);
@@ -886,11 +896,13 @@ export function renderStorePage({ store, products, bakedAt }) {
   <style>${criticalCss(theme)}</style>
   ${fbPixelHead(store)}
 </head>
-<body>
+<body${chromeOn ? ' class="pp-chrome-on"' : ''}>
+  ${headerHtml}
   ${heroHtml}
   <main>
     ${mainContent}
   </main>
+  ${footerHtml}
   <!-- baked: ${esc(bakedAt)} | ${list.length} productos -->
 
 ${cartShellHtml(store)}
@@ -926,7 +938,7 @@ function renderProductBlocks(product, placement) {
 // theme_config.product_page.chrome. 100% ADITIVO y fail-safe: si chrome.enabled
 // !== true ambos devuelven '' y la ficha conserva la barra "Volver" de hoy. Todo
 // texto/URL del dueño pasa por esc()/safeHref() (test de theme_config hostil).
-function chromeHeaderHtml(store, chrome, product) {
+function chromeHeaderHtml(store, chrome, product, rootHref = '../../') {
   if (!chrome || chrome.enabled !== true) return '';
   const ann = (chrome.announcement && typeof chrome.announcement === 'object') ? chrome.announcement : {};
   const annText = typeof ann.text === 'string' ? ann.text.trim() : '';
@@ -938,10 +950,12 @@ function chromeHeaderHtml(store, chrome, product) {
     ? `<nav class="pp-menu" aria-label="Menú">${links.map((l) => `<a href="${esc(safeHref(l.url))}">${esc(String(l.label).slice(0, 40))}</a>`).join('')}</nav>`
     : '<span class="pp-menu"></span>';
   const logoSrc = (typeof menu.logoUrl === 'string' && /^https?:\/\//i.test(menu.logoUrl)) ? menu.logoUrl : (store.logo_url || '');
+  const href = esc(rootHref);
   const logoHtml = logoSrc
-    ? `<a class="pp-logo" href="../../" aria-label="${esc(store.name || 'Inicio')}"><img src="${esc(cdnImage(logoSrc, 220, 80))}" alt="${esc(store.name || '')}" onerror="this.onerror=null;this.src='${esc(logoSrc)}'"></a>`
-    : `<a class="pp-logo pp-logo-txt" href="../../">${esc(store.name || 'Tienda')}</a>`;
-  const cartBtn = `<button class="pp-cart" type="button" data-buy="${esc(product.id)}" aria-label="Comprar">${CART_SVG}</button>`;
+    ? `<a class="pp-logo" href="${href}" aria-label="${esc(store.name || 'Inicio')}"><img src="${esc(cdnImage(logoSrc, 220, 80))}" alt="${esc(store.name || '')}" onerror="this.onerror=null;this.src='${esc(logoSrc)}'"></a>`
+    : `<a class="pp-logo pp-logo-txt" href="${href}">${esc(store.name || 'Tienda')}</a>`;
+  // Sin producto (portada) no hay nada que "Comprar" directo -> sin boton de carrito (no dejar un boton muerto).
+  const cartBtn = product ? `<button class="pp-cart" type="button" data-buy="${esc(product.id)}" aria-label="Comprar">${CART_SVG}</button>` : '';
   return `<header class="pp-chrome">${annBar}<div class="pp-chrome-nav">${linksHtml}${logoHtml}<div class="pp-chrome-act">${cartBtn}</div></div></header>`;
 }
 
@@ -1251,9 +1265,9 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   <main class="pp-wrap"${fullPage ? ' style="max-width:none;padding:0"' : ''}>
     ${mainInner}
   </main>
+  ${reviewsBlock}
   ${footerHtml}
   ${buyBar}
-  ${reviewsBlock}
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
 ${cartShellHtml(store)}
