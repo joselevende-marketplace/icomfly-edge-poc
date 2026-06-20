@@ -502,7 +502,12 @@ function hydrationScript() {
     // El orderNumber del intento se persiste y REUSA en reintentos (si la red
     // falla despues de crear la orden, un numero nuevo duplicaria pedidos).
     '    var att=null;try{att=localStorage.getItem("ico_order_attempt");}catch(e){}',
-    '    if(!att){att="#"+(Math.floor(Math.random()*90000)+10000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
+    // Numero UNICO por marca de tiempo(ms)+aleatorio. El indice UNIQUE(order_number)
+    // es GLOBAL entre TODAS las tiendas y el viejo "#"+aleatorio de 5 digitos (90k)
+    // chocaba -> 500 duplicate key. Ademas regenera los del formato viejo corto
+    // (#NNNNN) que quedaron PEGADOS en localStorage tras un choque (los desencalla).
+    // Sigue siendo "#"+digitos. Idempotencia intacta: una vez guardado se reutiliza.
+    '    if(!att||/^#[0-9]{4,6}$/.test(att)){att="#"+Date.now()+Math.floor(Math.random()*100000);try{localStorage.setItem("ico_order_attempt",att);}catch(e){}}',
     '    var body={orderNumber:att,',
     '      product:{id:pid,name:p.name,price:tot},',
     '      products:[{id:pid,name:p.name,price:unit,originalPrice:p.price,quantity:o.q,offerApplied:(o.d?{title:o.t,quantityReq:o.q,discount:o.d}:null),image:p.image||null}],',
