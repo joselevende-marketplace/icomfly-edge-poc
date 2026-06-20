@@ -793,7 +793,6 @@ function cartShellHtml(store) {
         ${mailField}
         <div id="coError" class="co-error" style="display:none"></div>
         <button id="coSubmit" class="finish" type="submit">${ctaText}</button>
-        <button id="coBack" class="co-back" type="button">Cancelar</button>
       </form>
     </div>
     <div id="doneView" class="dview co" style="display:none">
