@@ -28,6 +28,16 @@ function esc(value) {
 // el tag y ejecutar HTML/JS arbitrario (XSS). JSON.parse/JS lo leen identico.
 const safeJson = (o) => JSON.stringify(o).replace(/</g, '\\u003c');
 
+// Segmento de ruta legible para la ficha de producto (producto/<X>/). Devuelve
+// el SLUG (SEO) cuando es valido ([a-z0-9-], el mismo set que acepta el Worker
+// comodin); si no hay slug o no es valido, cae al id numerico de siempre
+// (retrocompat total). ADITIVO: nunca rompe una URL existente.
+export function productPath(product) {
+  const slug = product && product.slug != null ? String(product.slug).trim().toLowerCase() : '';
+  if (/^[a-z0-9-]+$/.test(slug)) return slug;
+  return product && product.id != null ? String(product.id) : '';
+}
+
 function formatPrice(value, store) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '';
@@ -117,11 +127,12 @@ function renderProductCard(product, store) {
     ? `<img src="${esc(cdnImage(img))}" alt="${esc(product.name)}" loading="lazy" decoding="async" width="400" height="400" onerror="this.onerror=null;this.src='${esc(img)}'">`
     : `<div class="noimg">Sin imagen</div>`;
 
-  // Link RELATIVO a la ficha horneada (producto/<id>/). Relativo para que
-  // funcione igual via Worker (tienda.myicomfly.com/producto/1/) y accediendo
-  // directo a Pages (.../<slug>/producto/1/). La imagen y el titulo navegan a
-  // la ficha; el boton sigue agregando al carrito sin salir de la pagina.
-  const href = `producto/${esc(product.id)}/`;
+  // Link RELATIVO a la ficha horneada (producto/<slug>/ si hay slug, si no
+  // producto/<id>/). Relativo para que funcione igual via Worker
+  // (tienda.myicomfly.com/producto/X/) y accediendo directo a Pages
+  // (.../<slug>/producto/X/). La imagen y el titulo navegan a la ficha; el
+  // boton sigue agregando al carrito por id (data-buy) sin salir de la pagina.
+  const href = `producto/${esc(productPath(product))}/`;
 
   // Categoria normalizada para el filtro por chips (data-cat). "Sin categoria"
   // queda vacia: el producto solo aparece en "Todos".
@@ -977,6 +988,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   <meta property="og:type" content="product">
   ${mainImg ? `<meta property="og:image" content="${esc(mainImg)}">` : ''}
   ${store.logo_url ? `<link rel="icon" href="${esc(store.logo_url)}">` : ''}
+  <link rel="canonical" href="../${esc(productPath(product))}/">
   <style>${criticalCss(theme)}</style>
   <script type="application/ld+json">${safeJson(jsonLd)}</script>
   ${fbPixelHead(store)}

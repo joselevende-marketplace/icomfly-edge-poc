@@ -17,7 +17,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderStorePage, renderProductPage } from './src/template.mjs';
+import { renderStorePage, renderProductPage, productPath } from './src/template.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -119,22 +119,38 @@ async function main() {
   const outFile = join(outDir, 'index.html');
   await writeFile(outFile, html, 'utf8');
 
-  // 5. Hornear la FICHA de cada producto -> dist/<slug>/producto/<id>/index.html
-  //    (el Worker comodin ya reenvia subrutas, asi que tienda.com/producto/<id>/
-  //    sirve esta pagina sin tocar el Worker). Un fallo en UNA ficha no tumba
-  //    el horneado de la tienda. Se hornean ANTES de escribir el meta.json para
-  //    poder registrar en el los ids realmente horneados (product_ids).
+  // 5. Hornear la FICHA de cada producto -> dist/<slug>/producto/<X>/index.html.
+  //    HORNEADO DUAL (aditivo): SIEMPRE se hornea producto/<id>/ (retrocompat de
+  //    los links viejos indexados/compartidos) y, ADEMAS, producto/<slug>/ cuando
+  //    el producto tiene slug valido -> URLs legibles para SEO. El Worker comodin
+  //    ya reenvia subrutas, asi que ambas sirven sin tocar el Worker. Un fallo en
+  //    UNA ficha no tumba el horneado de la tienda. Se hornean ANTES del meta.json
+  //    para registrar en product_ids TODAS las rutas horneadas (ids + slugs), de
+  //    modo que preserveLive las re-baje si un horneado futuro falla.
   let productPages = 0;
   const bakedProductIds = [];
+  const usedPaths = new Set();
   for (const p of (Array.isArray(allProducts) ? allProducts : [])) {
     if (!p || p.id == null) continue;
     try {
       const pHtml = renderProductPage({ store, product: p, products, bakedAt });
-      const pDir = join(outDir, 'producto', String(p.id));
-      await mkdir(pDir, { recursive: true });
-      await writeFile(join(pDir, 'index.html'), pHtml, 'utf8');
-      productPages++;
+      // Ficha por ID (retrocompat, como hasta hoy).
+      const idDir = join(outDir, 'producto', String(p.id));
+      await mkdir(idDir, { recursive: true });
+      await writeFile(join(idDir, 'index.html'), pHtml, 'utf8');
       bakedProductIds.push(String(p.id));
+      productPages++;
+      // Ficha por SLUG (URL legible). Solo si hay slug valido, distinto del id y
+      // sin colision con otro producto ya horneado en este run (el primero gana;
+      // el resto cae a su id, ya horneado arriba) -> nunca se pisa una ficha.
+      const sp = productPath(p);
+      if (sp && sp !== String(p.id) && !usedPaths.has(sp)) {
+        usedPaths.add(sp);
+        const slugDir = join(outDir, 'producto', sp);
+        await mkdir(slugDir, { recursive: true });
+        await writeFile(join(slugDir, 'index.html'), pHtml, 'utf8');
+        bakedProductIds.push(sp);
+      }
     } catch (e) {
       log(`  ⚠️ ficha del producto ${p.id} fallo: ${e.message}`);
     }
