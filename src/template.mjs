@@ -28,6 +28,19 @@ function esc(value) {
 // el tag y ejecutar HTML/JS arbitrario (XSS). JSON.parse/JS lo leen identico.
 const safeJson = (o) => JSON.stringify(o).replace(/</g, '\\u003c');
 
+// Icono de carrito (SVG) reutilizado por el CTA, la barra flotante y el header
+// configurable del dominio propio (chrome).
+const CART_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>';
+
+// href seguro para enlaces configurables (menu/footer del header). Solo deja
+// pasar esquemas inocuos; cualquier otra cosa (javascript:, data:, etc.) cae a '#'.
+function safeHref(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!s) return '#';
+  if (/^(https?:\/\/|\/|\.\.?\/|#|mailto:|tel:)/i.test(s)) return s;
+  return '#';
+}
+
 // Segmento de ruta legible para la ficha de producto (producto/<X>/). Devuelve
 // el SLUG (SEO) cuando es valido ([a-z0-9-], el mismo set que acepta el Worker
 // comodin); si no hay slug o no es valido, cae al id numerico de siempre
@@ -331,6 +344,34 @@ function criticalCss(theme) {
     .pp-desc2 img{max-width:100%;height:auto;border-radius:10px}
     .pp-desc2 h2,.pp-desc2 h3{margin:14px 0 8px;color:var(--text)}
     .pp-desc2 p{margin:8px 0}
+    /* === Chrome del dominio propio (header + footer configurables) ===
+       Solo se inyecta cuando theme_config.product_page.chrome.enabled === true;
+       con body.pp-chrome-on tambien se pule el layout desktop. Sin chrome, nada
+       de esto se renderiza y la ficha se ve exactamente como hoy. */
+    .pp-ann{background:var(--primary);color:#fff;text-align:center;font-size:.82rem;font-weight:700;padding:7px 12px;line-height:1.3}
+    .pp-chrome{position:sticky;top:0;z-index:42;background:#fff;box-shadow:0 1px 0 rgba(16,24,40,.07)}
+    .pp-chrome-nav{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:11px 16px}
+    .pp-menu{display:none;gap:22px;align-items:center;min-width:0}
+    @media(min-width:880px){.pp-menu{display:flex}}
+    .pp-menu a{color:var(--text);text-decoration:none;font-weight:600;font-size:.92rem;white-space:nowrap}
+    .pp-menu a:hover{color:var(--primary)}
+    .pp-logo{justify-self:center;display:flex;align-items:center;text-decoration:none;min-width:0}
+    .pp-logo img{height:34px;width:auto;max-width:180px;display:block;object-fit:contain}
+    .pp-logo-txt{font-weight:800;font-size:1.25rem;color:var(--text);letter-spacing:-.5px;white-space:nowrap}
+    .pp-chrome-act{justify-self:end;display:flex;align-items:center;gap:8px}
+    .pp-cart{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;background:none;color:var(--text);cursor:pointer;border-radius:10px}
+    .pp-cart:hover{background:#f1f3f7}
+    .pp-pay{margin-top:14px;font-size:.78rem;color:var(--muted);text-align:center;line-height:1.5}
+    .pp-foot{margin-top:48px;background:#0f172a;color:#cbd5e1;padding:30px 16px;text-align:center}
+    .pp-foot-links{display:flex;flex-wrap:wrap;gap:12px 22px;justify-content:center;margin-bottom:14px}
+    .pp-foot-links a{color:inherit;text-decoration:none;font-weight:600;font-size:.9rem;opacity:.92}
+    .pp-foot-links a:hover{opacity:1;text-decoration:underline}
+    .pp-foot-txt{font-size:.8rem;opacity:.7;line-height:1.55;max-width:680px;margin:0 auto}
+    @media(min-width:880px){
+      body.pp-chrome-on .pp-wrap{max-width:1180px;padding-top:26px}
+      body.pp-chrome-on .pp2{grid-template-columns:1.1fr .9fr;gap:48px}
+      body.pp-chrome-on .pp-info2{position:sticky;top:88px}
+    }
   `.trim();
 }
 
@@ -844,6 +885,42 @@ function renderProductBlocks(product, placement) {
     .join('\n');
 }
 
+// "Chrome" del storefront (header con barra de anuncio + menu + logo + carrito,
+// y footer) para la ficha del DOMINIO PROPIO. Configurable desde
+// theme_config.product_page.chrome. 100% ADITIVO y fail-safe: si chrome.enabled
+// !== true ambos devuelven '' y la ficha conserva la barra "Volver" de hoy. Todo
+// texto/URL del dueño pasa por esc()/safeHref() (test de theme_config hostil).
+function chromeHeaderHtml(store, chrome, product) {
+  if (!chrome || chrome.enabled !== true) return '';
+  const ann = (chrome.announcement && typeof chrome.announcement === 'object') ? chrome.announcement : {};
+  const annText = typeof ann.text === 'string' ? ann.text.trim() : '';
+  const annStyle = `${ann.bg ? `background:${esc(ann.bg)};` : ''}${ann.color ? `color:${esc(ann.color)};` : ''}`;
+  const annBar = annText ? `<div class="pp-ann"${annStyle ? ` style="${annStyle}"` : ''}>${esc(annText)}</div>` : '';
+  const menu = (chrome.menu && typeof chrome.menu === 'object') ? chrome.menu : {};
+  const links = (Array.isArray(menu.links) ? menu.links : []).filter((l) => l && l.label).slice(0, 8);
+  const linksHtml = links.length
+    ? `<nav class="pp-menu" aria-label="Menú">${links.map((l) => `<a href="${esc(safeHref(l.url))}">${esc(String(l.label).slice(0, 40))}</a>`).join('')}</nav>`
+    : '<span class="pp-menu"></span>';
+  const logoSrc = (typeof menu.logoUrl === 'string' && /^https?:\/\//i.test(menu.logoUrl)) ? menu.logoUrl : (store.logo_url || '');
+  const logoHtml = logoSrc
+    ? `<a class="pp-logo" href="../../" aria-label="${esc(store.name || 'Inicio')}"><img src="${esc(cdnImage(logoSrc, 220, 80))}" alt="${esc(store.name || '')}" onerror="this.onerror=null;this.src='${esc(logoSrc)}'"></a>`
+    : `<a class="pp-logo pp-logo-txt" href="../../">${esc(store.name || 'Tienda')}</a>`;
+  const cartBtn = `<button class="pp-cart" type="button" data-buy="${esc(product.id)}" aria-label="Comprar">${CART_SVG}</button>`;
+  return `<header class="pp-chrome">${annBar}<div class="pp-chrome-nav">${linksHtml}${logoHtml}<div class="pp-chrome-act">${cartBtn}</div></div></header>`;
+}
+
+function chromeFooterHtml(store, chrome) {
+  if (!chrome || chrome.enabled !== true) return '';
+  const f = (chrome.footer && typeof chrome.footer === 'object') ? chrome.footer : {};
+  const links = (Array.isArray(f.links) ? f.links : []).filter((l) => l && l.label).slice(0, 12);
+  const linksHtml = links.length
+    ? `<nav class="pp-foot-links" aria-label="Enlaces">${links.map((l) => `<a href="${esc(safeHref(l.url))}">${esc(String(l.label).slice(0, 40))}</a>`).join('')}</nav>`
+    : '';
+  const text = (typeof f.text === 'string' && f.text.trim()) ? esc(f.text.trim()) : `© ${esc(store.name || '')}`;
+  const style = `${f.bg ? `background:${esc(f.bg)};` : ''}${f.color ? `color:${esc(f.color)};` : ''}`;
+  return `<footer class="pp-foot"${style ? ` style="${style}"` : ''}>${linksHtml}<div class="pp-foot-txt">${text}</div></footer>`;
+}
+
 export function renderProductPage({ store, product, products, bakedAt }) {
   const theme = store.theme_config || {};
   const storeName = store.name || 'Tienda';
@@ -906,7 +983,15 @@ export function renderProductPage({ store, product, products, bakedAt }) {
         `<button type="button" class="${i === 0 ? 'on' : ''}" aria-label="Ver imagen ${i + 1}"><img src="${esc(cdnImage(u, 128, 70))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${esc(u)}'"></button>`
       ).join('')}</div>`
     : '';
-  const cartSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>';
+  const cartSvg = CART_SVG;
+
+  // Chrome del dominio propio (header/footer configurables). Aditivo: con
+  // chrome.enabled !== true, chromeOn es false y la ficha se ve igual que hoy.
+  const chrome = (cfg.chrome && typeof cfg.chrome === 'object') ? cfg.chrome : null;
+  const chromeOn = !!(chrome && chrome.enabled === true);
+  const payRaw = chromeOn && typeof chrome.payments === 'string' ? chrome.payments.trim() : '';
+  const payText = chromeOn ? (payRaw || 'Pago contra entrega · Tarjeta · PSE · Addi · Nequi') : '';
+  const payHtml = payText ? `<div class="pp-pay">${esc(payText)}</div>` : '';
 
   // SEO: JSON-LD de producto (la Edge es la variante orientada a velocidad/SEO).
   const jsonLd = {
@@ -1009,11 +1094,21 @@ export function renderProductPage({ store, product, products, bakedAt }) {
           ${benefits.map((b) => `<div><span>${esc((b && b.icon) || '')}</span><span>${esc((b && b.text) || '')}</span></div>`).join('')}
         </div>
         <button class="pp-cta" type="button" data-buy="${esc(product.id)}" style="${ctaStyle}">${cartSvg}${esc(ctaText)}</button>
+        ${payHtml}
       </section>
     </div>
     ${descHtml ? `<div class="pp-desc2">${descHtml}</div>` : ''}
     ${blocksBottom}`;
   }
+
+  // Header (anuncio + menu + logo + carrito) y footer del dominio propio.
+  // Con chrome apagado, headerHtml es la barra "Volver" de siempre y footerHtml
+  // es ''. El footer no se muestra en modo página completa (la barra de compra
+  // flotante ya ocupa el fondo). Aditivo: cero cambio visual sin chrome.
+  const headerHtml = chromeOn
+    ? chromeHeaderHtml(store, chrome, product)
+    : `<nav class="pp-top"><a href="../../">← Volver a ${esc(storeName)}</a></nav>`;
+  const footerHtml = (chromeOn && !fullPage) ? chromeFooterHtml(store, chrome) : '';
 
   return `<!doctype html>
 <html lang="es">
@@ -1031,13 +1126,12 @@ export function renderProductPage({ store, product, products, bakedAt }) {
   <script type="application/ld+json">${safeJson(jsonLd)}</script>
   ${fbPixelHead(store)}
 </head>
-<body class="pp-page">
-  <nav class="pp-top">
-    <a href="../../">← Volver a ${esc(storeName)}</a>
-  </nav>
+<body class="pp-page${chromeOn ? ' pp-chrome-on' : ''}">
+  ${headerHtml}
   <main class="pp-wrap"${fullPage ? ' style="max-width:none;padding:0"' : ''}>
     ${mainInner}
   </main>
+  ${footerHtml}
   ${buyBar}
   <!-- baked: ${esc(bakedAt)} | producto ${esc(product.id)} -->
 
