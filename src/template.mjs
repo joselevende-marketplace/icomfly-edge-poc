@@ -265,6 +265,9 @@ function criticalCss(theme) {
     .co label i{color:#e11d48;font-style:normal}
     .co select{width:100%;padding:11px 12px;border:1px solid #d8dee8;border-radius:10px;margin:4px 0 12px;font-size:.95rem;font-family:inherit;background:#fff}
     .co select.bad{border-color:#e11d48}
+    /* CELULAR: 16px evita el auto-zoom de iOS al enfocar un campo (con <16px hace zoom
+       y genera friccion). Solo mobile; en escritorio los campos se ven igual que hoy. */
+    @media(max-width:879px){.co input,.co select{font-size:16px}}
     .finish{display:block;width:100%;border:0;cursor:pointer;background:#22c55e;color:#06250f;font-weight:800;padding:14px;border-radius:12px;font-size:.98rem}
     .finish:hover{filter:brightness(.96)}
     .finish:disabled{opacity:.6;cursor:wait}
