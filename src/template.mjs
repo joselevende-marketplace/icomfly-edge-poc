@@ -540,6 +540,7 @@ function hydrationScript() {
     '        }',
     '        var num=String((res.j.data&&res.j.data.order_number)||body.orderNumber).replace(/^#/,"");',
     '        try{localStorage.removeItem("ico_order_attempt");}catch(e){}',
+    '        try{localStorage.removeItem("ico_cart_session");}catch(e){}',
     '        var msgEl=document.getElementById("doneMsg");',
     '        if(msgEl){msgEl.textContent="Tu pedido #"+num+" quedo registrado y pagas al recibirlo (contra entrega). Te contactaremos para coordinar la entrega.";}',
     '        var waBtn=document.getElementById("doneWa");',
@@ -590,6 +591,21 @@ function hydrationScript() {
     '    combo("coCity","coCityDD",function(){var d=document.getElementById("coDept");return citiesFor(d?d.value:"");});',
     '  }',
     '  var coForm=document.getElementById("coForm"); if(coForm){coForm.addEventListener("submit",submitOrder);} setupGeoCombos();',
+    // [Carrito edge] Guardado periodico (debounced) del checkout en progreso a /edge-carts.
+    // Fire-and-forget: NO afecta el envio de la orden. El backend decide (gracia 30 min).
+    '  var _ecTimer=null;',
+    '  function edgeCartSession(){var k=null;try{k=localStorage.getItem("ico_cart_session");}catch(e){}if(!k){k="ecs_"+Date.now()+"_"+Math.floor(Math.random()*100000);try{localStorage.setItem("ico_cart_session",k);}catch(e){}}return k;}',
+    '  function saveEdgeCart(){try{',
+    '    var name=fieldVal("coName"),last=fieldVal("coLast"),phone=fieldVal("coPhone");',
+    '    if(phone.replace(/\\D/g,"").length<7||!name){return;}',
+    '    var p=map(SEL.id);if(!p){return;}var o=curOpt();var unit=unitPrice(p.price,o.d);var tot=unit*o.q;var merged=!document.getElementById("coLast");',
+    '    var dept=fieldVal("coDept"),city=fieldVal("coCity"),addr=fieldVal("coAddr"),hood=fieldVal("coHood"),mail=fieldVal("coMail");',
+    '    var pid=isNaN(Number(SEL.id))?SEL.id:Number(SEL.id);',
+    '    var body={sessionKey:edgeCartSession(),product:{id:pid,name:p.name,price:unit},quantity:o.q,subtotal:tot,total:tot,shippingOption:"standard",quantityOfferApplied:!!o.d,quantityOfferTitle:(o.d?o.t:null),quantityOfferDiscount:(o.d||null),customer:{fullName:(merged?name:(name+" "+last)).replace(/\\s+/g," ").replace(/^\\s+|\\s+$/g,""),phone:phone,whatsapp:phone,address:(addr+", "+hood),department:dept,city:city,email:mail}};',
+    '    fetch(API+"/edge-carts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),keepalive:true}).catch(function(){});',
+    '  }catch(e){}}',
+    '  if(coForm){coForm.addEventListener("input",function(){if(_ecTimer){clearTimeout(_ecTimer);}_ecTimer=setTimeout(saveEdgeCart,3500);});}',
+    '  try{window.addEventListener("beforeunload",saveEdgeCart);}catch(e){}',
     '})();',
   ].join('\n');
 }
