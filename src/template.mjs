@@ -1118,6 +1118,14 @@ function chromeHeaderHtml(store, chrome, product, rootHref = '../../') {
   const annText = typeof ann.text === 'string' ? ann.text.trim() : '';
   const annStyle = `${ann.bg ? `background:${esc(ann.bg)};` : ''}${ann.color ? `color:${esc(ann.color)};` : ''}`;
   const annBar = annText ? `<div class="pp-ann"${annStyle ? ` style="${annStyle}"` : ''}>${esc(annText)}</div>` : '';
+  // [Encabezado libre — SOLO store 11] Si el dueño activó el modo libre, el header
+  // se pinta desde el HTML PRE-RENDERIZADO del lienzo (chrome.canvasHtml, generado
+  // por el admin igual que las secciones). El edge solo lo inyecta -> cero
+  // divergencia de render. Aditivo y gateado: cualquier otra tienda/caso -> header
+  // clásico byte-idéntico. El carrito/lupa del lienzo son decorativos (movibles).
+  if (Number(store.id) === 11 && chrome.layout === 'free' && typeof chrome.canvasHtml === 'string' && chrome.canvasHtml.trim()) {
+    return `<header class="pp-chrome pp-chrome-free">${annBar}<div class="pp-chrome-freewrap" style="max-width:1180px;margin:0 auto;">${chrome.canvasHtml}</div></header>`;
+  }
   const menu = (chrome.menu && typeof chrome.menu === 'object') ? chrome.menu : {};
   const links = (Array.isArray(menu.links) ? menu.links : []).filter((l) => l && l.label).slice(0, 8);
   const linksHtml = links.length
