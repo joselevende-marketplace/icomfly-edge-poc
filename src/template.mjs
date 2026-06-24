@@ -893,6 +893,88 @@ function fbPixelHead(store) {
 <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${firstId}&ev=PageView&noscript=1"/></noscript>`;
 }
 
+// ---------------------------------------------------------------------------
+// [Buscador — SOLO store 11] El editor de Personalizacion web publica un marcador
+// <!--WB_SEARCH:config--> donde el dueno coloque el bloque "Buscador". Aqui lo
+// sustituimos por una barra/lupa estatica + un JS de filtrado que se cuelga del
+// MISMO filtro de tarjetas que ya usan los chips de categoria (filtra .card por el
+// texto de .card-title, respetando la categoria activa). TODO esto esta acotado a
+// store 11 en los puntos de llamada: para cualquier otra tienda no se ejecuta nada
+// y su HTML horneado queda byte-identico (cero regresion).
+// ---------------------------------------------------------------------------
+const WB_SEARCH_SIZES = {
+  sm: { padY: 6, padX: 10, font: 13, icon: 16, gap: 8 },
+  md: { padY: 9, padX: 12, font: 14, icon: 18, gap: 10 },
+  lg: { padY: 12, padX: 14, font: 16, icon: 20, gap: 12 },
+};
+const WB_SEARCH_SHADOWS = { none: 'none', sm: '0 1px 2px rgba(0,0,0,0.06)', md: '0 6px 16px rgba(0,0,0,0.12)' };
+
+function wbMagnifier(size, color) {
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + esc(color || '#6b7280') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+}
+
+// Barra del bloque "Buscador" colocado en la pagina (modo lupa u expandida).
+function wbSearchBlockHtml(cfg) {
+  cfg = cfg || {};
+  const sz = WB_SEARCH_SIZES[cfg.size] || WB_SEARCH_SIZES.md;
+  const radius = (Number(cfg.radius) >= 999) ? '999px' : ((Number(cfg.radius) || 0) + 'px');
+  const shadow = WB_SEARCH_SHADOWS[cfg.shadow] || 'none';
+  const align = (cfg.align === 'center') ? 'center' : (cfg.align === 'right' ? 'flex-end' : 'flex-start');
+  const iconColor = esc(cfg.iconColor || '#6b7280');
+  const icon = wbMagnifier(sz.icon, cfg.iconColor || '#6b7280');
+  const ph = esc(cfg.placeholder || 'Buscar productos...');
+  const bg = esc(cfg.bgColor || '#ffffff'), bd = esc(cfg.borderColor || '#d1d5db'), tx = esc(cfg.textColor || '#111827');
+  const width = Number(cfg.width) > 0 ? Number(cfg.width) : 320;
+  const dir = (cfg.iconSide === 'right') ? 'row-reverse' : 'row';
+  const collapsed = cfg.mode !== 'expanded';
+  const inputHtml = '<input type="text" class="wb-search-input" placeholder="' + ph + '" style="flex:1;min-width:0;border:none;outline:none;background:transparent;color:' + tx + ';font-size:' + sz.font + 'px;">';
+  const wrapStart = '<div class="wb-search" style="display:flex;justify-content:' + align + ';width:100%;margin:8px 0;">';
+  if (collapsed) {
+    return wrapStart
+      + '<form class="wb-search-form" onsubmit="return false" style="display:inline-flex;align-items:center;gap:' + sz.gap + 'px;flex-direction:' + dir + ';background:' + bg + ';border:1px solid ' + bd + ';border-radius:' + radius + ';box-shadow:' + shadow + ';box-sizing:border-box;padding:' + sz.padY + 'px ' + sz.padX + 'px;max-width:' + width + 'px;">'
+      + '<button type="button" class="wb-search-toggle" aria-label="Buscar" style="display:inline-flex;align-items:center;background:transparent;border:none;padding:0;cursor:pointer;flex-shrink:0;color:' + iconColor + ';">' + icon + '</button>'
+      + '<span class="wb-search-field" style="display:none;flex:1;min-width:0;align-items:center;">' + inputHtml + '</span>'
+      + '</form></div>';
+  }
+  return wrapStart
+    + '<form class="wb-search-form" onsubmit="return false" style="display:flex;align-items:center;gap:' + sz.gap + 'px;flex-direction:' + dir + ';width:100%;max-width:' + width + 'px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:' + radius + ';box-shadow:' + shadow + ';box-sizing:border-box;padding:' + sz.padY + 'px ' + sz.padX + 'px;">'
+    + '<button type="submit" class="wb-search-toggle" aria-label="Buscar" style="display:inline-flex;align-items:center;background:transparent;border:none;padding:0;cursor:pointer;flex-shrink:0;color:' + iconColor + ';">' + icon + '</button>'
+    + inputHtml
+    + '</form></div>';
+}
+
+// Lupa del header (chrome) — solo portada. Reusa las mismas clases para que el JS
+// de filtrado la cablee automaticamente.
+function wbHeaderSearchHtml() {
+  const icon = wbMagnifier(20, '#1f2430');
+  return '<div class="wb-search" style="display:flex;align-items:center;">'
+    + '<form class="wb-search-form" onsubmit="return false" style="display:flex;align-items:center;gap:8px;">'
+    + '<button type="button" class="wb-search-toggle" aria-label="Buscar" style="display:inline-flex;align-items:center;background:transparent;border:none;padding:4px;cursor:pointer;color:#1f2430;">' + icon + '</button>'
+    + '<span class="wb-search-field" style="display:none;align-items:center;"><input type="text" class="wb-search-input" placeholder="Buscar productos..." style="width:160px;max-width:42vw;border:1px solid #e2e8f0;border-radius:999px;padding:6px 12px;font-size:14px;outline:none;color:#1f2430;background:#f7f8fa;"></span>'
+    + '</form></div>';
+}
+
+// Runtime de filtrado (se inyecta SOLO en store 11 cuando hay buscador). Filtra
+// .card por el texto de .card-title respetando la categoria activa, y abre/cierra
+// la lupa. Aditivo: corre despues del handler de chips (re-aplica al hacer clic).
+function wbSearchRuntime() {
+  return `<script>(function(){
+  function txt(c){var t=c.querySelector(".card-title");return (t?(t.textContent||""):"").toLowerCase();}
+  var term="";
+  function apply(){
+    var ab=document.querySelector("[data-catbtn].on");var sel=ab?ab.getAttribute("data-catbtn"):"";
+    var q=term.trim();var cards=document.querySelectorAll(".card[data-cat]");
+    for(var i=0;i<cards.length;i++){var c=cards[i];var catOk=!sel||c.getAttribute("data-cat")===sel;var nameOk=!q||txt(c).indexOf(q)>=0;c.style.display=(catOk&&nameOk)?"":"none";}
+  }
+  document.addEventListener("input",function(e){var el=e.target;if(el&&el.classList&&el.classList.contains("wb-search-input")){term=(el.value||"").toLowerCase();apply();}});
+  document.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest){return;}
+    var tog=t.closest(".wb-search-toggle");
+    if(tog){var form=tog.closest(".wb-search-form");if(form){var fld=form.querySelector(".wb-search-field");if(fld){var open=fld.style.display!=="none";fld.style.display=open?"none":"flex";if(!open){var inp=fld.querySelector(".wb-search-input");if(inp){inp.focus();}}}}}
+    if(t.closest("[data-catbtn]")){setTimeout(apply,0);}
+  });
+})();</script>`;
+}
+
 // --- Render de la pagina completa ---
 
 export function renderStorePage({ store, products, bakedAt }) {
@@ -955,6 +1037,21 @@ export function renderStorePage({ store, products, bakedAt }) {
   const headerHtml = chromeOn ? chromeHeaderHtml(store, chrome, null, './') : '';
   const footerHtml = chromeOn ? chromeFooterHtml(store, chrome) : '';
 
+  // [Buscador — SOLO store 11] Sustituye los marcadores <!--WB_SEARCH:cfg--> del
+  // editor por la barra real. Acotado a store 11: cualquier otra tienda salta todo
+  // esto y su HTML queda byte-identico. hasSearch = hay bloque colocado O lupa de
+  // header (chrome on) -> decide si inyectamos el runtime de filtrado.
+  const searchOn = Number(store && store.id) === 11;
+  const hasBlockSearch = searchOn && customHtml.includes('<!--WB_SEARCH:');
+  const hasSearch = hasBlockSearch || (searchOn && chromeOn);
+  if (hasBlockSearch) {
+    mainContent = mainContent.replace(/<!--WB_SEARCH:([\s\S]*?)-->/g, (m, b64) => {
+      let cfg = {};
+      try { cfg = JSON.parse(Buffer.from(String(b64 || ''), 'base64').toString('utf8')); } catch (e) { cfg = {}; }
+      return wbSearchBlockHtml(cfg);
+    });
+  }
+
   // Datos minimos para el carrito (id -> {name, price, image}) y la tienda.
   const productMap = buildProductMap(list);
   const storeJs = buildStoreJs(store);
@@ -984,6 +1081,7 @@ export function renderStorePage({ store, products, bakedAt }) {
 ${cartShellHtml(store)}
 
   ${runtimeScripts(storeJs, productMap)}
+  ${hasSearch ? wbSearchRuntime() : ''}
 </body>
 </html>`;
 }
@@ -1032,7 +1130,11 @@ function chromeHeaderHtml(store, chrome, product, rootHref = '../../') {
     : `<a class="pp-logo pp-logo-txt" href="${href}">${esc(store.name || 'Tienda')}</a>`;
   // Sin producto (portada) no hay nada que "Comprar" directo -> sin boton de carrito (no dejar un boton muerto).
   const cartBtn = product ? `<button class="pp-cart" type="button" data-buy="${esc(product.id)}" aria-label="Comprar">${CART_SVG}</button>` : '';
-  return `<header class="pp-chrome">${annBar}<div class="pp-chrome-nav">${linksHtml}${logoHtml}<div class="pp-chrome-act">${cartBtn}</div></div></header>`;
+  // [Buscador — SOLO store 11] Lupa en el header de la PORTADA (product null): al
+  // desplegarse filtra el catalogo via el runtime wbSearchRuntime. En fichas de
+  // producto no se pone (no hay grilla que filtrar). Cualquier otra tienda: ''.
+  const headerSearch = (Number(store.id) === 11 && !product) ? wbHeaderSearchHtml() : '';
+  return `<header class="pp-chrome">${annBar}<div class="pp-chrome-nav">${linksHtml}${logoHtml}<div class="pp-chrome-act">${headerSearch}${cartBtn}</div></div></header>`;
 }
 
 function chromeFooterHtml(store, chrome) {
