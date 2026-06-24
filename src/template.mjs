@@ -1147,6 +1147,12 @@ function chromeHeaderHtml(store, chrome, product, rootHref = '../../') {
 
 function chromeFooterHtml(store, chrome) {
   if (!chrome || chrome.enabled !== true) return '';
+  // [Pie libre — SOLO store 11] mismo patrón que el encabezado libre: inyecta el
+  // HTML pre-renderizado del lienzo del pie. Aditivo y gateado -> otras tiendas
+  // conservan el pie clásico byte-idéntico.
+  if (Number(store.id) === 11 && chrome.footerLayout === 'free' && typeof chrome.footerCanvasHtml === 'string' && chrome.footerCanvasHtml.trim()) {
+    return `<footer class="pp-foot pp-foot-free"><div class="pp-chrome-freewrap" style="max-width:1180px;margin:0 auto;">${chrome.footerCanvasHtml}</div></footer>`;
+  }
   const f = (chrome.footer && typeof chrome.footer === 'object') ? chrome.footer : {};
   const links = (Array.isArray(f.links) ? f.links : []).filter((l) => l && l.label).slice(0, 12);
   const linksHtml = links.length
