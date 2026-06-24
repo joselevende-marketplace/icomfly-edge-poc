@@ -433,7 +433,7 @@ function hydrationScript() {
     '(function(){',
     '  var S=window.__STORE__||{}; var P=window.__PRODUCTS__||{};',
     '  var bg=document.getElementById("drawerBg"), dr=document.getElementById("drawer");',
-    '  function map(id){return P[id]||{name:"Producto",price:0,image:"",offers:[]};}',
+    '  function map(id){return P[id]||{name:"Producto",price:0,image:"",offers:[],unitLabel:""};}',
     // Escapa HTML antes de concatenar a innerHTML (DOM XSS).
     '  function eh(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}',
     '  function fmt(n){try{return new Intl.NumberFormat(S.locale||"es-CO",{style:"currency",currency:S.currency||"COP",maximumFractionDigits:0}).format(n);}catch(e){return (S.symbol||"$")+Math.round(n).toLocaleString("es-CO");}}',
@@ -469,7 +469,7 @@ function hydrationScript() {
     // "Comprar": abre el drawer DIRECTO en el formulario con este producto.
     '  function buyNow(id){',
     '    var p=map(id);if(!p||!p.price){return;}',
-    '    SEL.id=id;SEL.i=0;OPTS=[{q:1,d:0,t:"1 unidad"}];',
+    '    SEL.id=id;SEL.i=0;OPTS=[{q:1,d:0,t:(p.unitLabel||"1 unidad")}];',
     '    var of=p.offers||[];',
     '    for(var i=0;i<of.length;i++){if(of[i]&&of[i].q>=2){OPTS.push({q:of[i].q,d:of[i].d||0,t:of[i].t||(of[i].q+" unidades")});}}',
     '    renderOffers();',
@@ -631,6 +631,9 @@ function buildProductMap(list) {
       price: Number(p.price) || 0,
       image: firstImage(p),
       offers,
+      // Etiqueta personalizable para la opcion "1 unidad" (products.unit_label).
+      // Si esta vacia, buyNow cae al literal "1 unidad" como hoy (cero regresion).
+      unitLabel: String((p && p.unit_label) || '').trim(),
     };
   }
   return productMap;
