@@ -977,6 +977,32 @@ function wbSearchRuntime() {
 
 // --- Render de la pagina completa ---
 
+// Decodifica la config (base64 unicode-safe) del marcador del catalogo
+// <!--WB_CATALOG:cfg-->. Espejo de decodeSearchConfig de PublicStoreHome.jsx.
+// Devuelve null si no hay config o si el base64 esta corrupto (fail-safe: la
+// franja queda neutra). atob/escape/decodeURIComponent existen en Node y en el
+// runtime del Worker -> NO introduce APIs de Node sin guard (regla #426).
+function decodeCatalogConfig(b64) {
+  if (!b64) return null;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  } catch {
+    return null;
+  }
+}
+
+// CSS inline de la franja del catalogo a partir de su config (fondo/espaciado).
+// Solo incluye lo seteado; el fondo se escapa con esc() (viene del config del
+// dueno, igual se sanea para no romper el atributo style). Espejo del catalogStyle
+// de PublicStoreHome.jsx.
+function catalogBandStyle(cfg) {
+  const parts = [];
+  if (cfg.bg) parts.push(`background:${esc(String(cfg.bg))}`);
+  if (cfg.paddingTop) parts.push(`padding-top:${parseInt(cfg.paddingTop, 10) || 0}px`);
+  if (cfg.paddingBottom) parts.push(`padding-bottom:${parseInt(cfg.paddingBottom, 10) || 0}px`);
+  return parts.join(';');
+}
+
 export function renderStorePage({ store, products, bakedAt }) {
   const theme = store.theme_config || {};
   const title = store.name || 'Tienda';
@@ -1008,15 +1034,30 @@ export function renderStorePage({ store, products, bakedAt }) {
     ? `${catsBar}<section class="grid">${cards}</section>`
     : `<div class="empty">Esta tienda aun no tiene productos publicados.</div>`;
 
-  // El web_page_html del editor trae el marcador <!--WB_CATALOG--> donde debe ir
-  // el catalogo (igual que el storefront real de icomfly.com). Si existe, partimos
-  // el HTML e insertamos la grilla ahi; si no, va al final. La pagina publicada
-  // trae su propio diseno completo, asi que NO ponemos el hero/footer genericos.
-  const MARKER = '<!--WB_CATALOG-->';
+  // El web_page_html del editor trae el marcador del catalogo donde debe ir la
+  // grilla (igual que el storefront real de icomfly.com). DOS formas: la clasica
+  // <!--WB_CATALOG--> o, si la franja del catalogo tiene fondo/espaciado propios,
+  // <!--WB_CATALOG:base64cfg--> (mismo esquema que el buscador). Entendemos AMBAS
+  // -igual que PublicStoreHome.jsx- asi una pagina con franja configurada NO manda
+  // el catalogo al final ni deja el comentario suelto. La pagina publicada trae su
+  // propio diseno completo, asi que NO ponemos el hero/footer genericos.
+  const CATALOG_RE = /<!--WB_CATALOG(?::([A-Za-z0-9+/=]*))?-->/;
   let mainContent;
-  if (customHtml && customHtml.includes(MARKER)) {
-    const parts = customHtml.split(MARKER);
-    mainContent = parts[0] + grid + parts.slice(1).join('');
+  const catalogMatch = customHtml ? customHtml.match(CATALOG_RE) : null;
+  if (catalogMatch) {
+    // Fondo/espaciado propios de la franja (si el dueno los configuro). Sin
+    // config -> null -> la grilla se ve igual que siempre (marcador clasico).
+    const bandCfg = decodeCatalogConfig(catalogMatch[1]);
+    const bandStyle = bandCfg ? catalogBandStyle(bandCfg) : '';
+    const styledGrid = bandStyle ? `<div style="${bandStyle}">${grid}</div>` : grid;
+    const idx = catalogMatch.index;
+    const before = customHtml.slice(0, idx);
+    // Quitar cualquier marcador ADICIONAL del resto (ambas formas) para que no
+    // quede un comentario suelto visible (igual que PublicStoreHome.jsx).
+    const after = customHtml
+      .slice(idx + catalogMatch[0].length)
+      .replace(new RegExp(CATALOG_RE.source, 'g'), '');
+    mainContent = before + styledGrid + after;
   } else if (customHtml) {
     mainContent = customHtml + '\n' + grid;
   } else {
