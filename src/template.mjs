@@ -975,6 +975,82 @@ function wbSearchRuntime() {
 })();</script>`;
 }
 
+// [Buscador del lienzo libre — SOLO store 11] El encabezado en modo "diseno libre"
+// (chrome.layout==='free', #669) pinta SOLO el lienzo pre-renderizado: la lupa que
+// el dueno coloca ahi es un objeto decorativo (type:'icon', iconName:'search') SIN
+// accion -> al tocarla no pasa nada (ni en portada ni en ficha). El header CLASICO
+// si tenia lupa funcional (wbHeaderSearchHtml), pero la rama free retorna antes
+// (chromeHeaderHtml). Estas 3 piezas reconectan ESA lupa SIN re-publicar: el edge
+// ya tiene el modelo del lienzo (chrome.canvas) con el id del icono, asi que el
+// runtime cablea el clic a [data-wb-obj="<id>"]. Aditivo y gateado: sin icono de
+// busqueda en el lienzo, todo devuelve '' y la pagina queda byte-identica.
+
+// Id del objeto-icono 'search' del lienzo del encabezado (o '' si no hay). Solo
+// LEE chrome.canvas (modelo); fail-safe ante data corrupta. Exige id seguro
+// [A-Za-z0-9_-] para no romper el selector del runtime (defensa anti-inyeccion).
+function freeCanvasSearchIconId(chrome) {
+  try {
+    const canvas = chrome && chrome.canvas;
+    const secs = (canvas && Array.isArray(canvas.sections)) ? canvas.sections : [];
+    for (const sec of secs) {
+      const objs = (sec && Array.isArray(sec.objects)) ? sec.objects : [];
+      for (const o of objs) {
+        if (o && o.type === 'icon' && o.iconName === 'search' && o.id && /^[A-Za-z0-9_-]+$/.test(String(o.id))) {
+          return String(o.id);
+        }
+      }
+    }
+  } catch (e) { /* fail-safe */ }
+  return '';
+}
+
+// ¿El encabezado LIBRE realmente se pinta? Debe ser la MISMA condicion que usa
+// chromeHeaderHtml para retornar el canvasHtml (store 11 + layout free + canvasHtml
+// no vacio). Si layout='free' pero canvasHtml esta vacio, chromeHeaderHtml cae al
+// header CLASICO (que en la portada SI trae lupa funcional via wbSearchRuntime), asi
+// que ahi NO debemos gatear como "libre" o mataríamos esa lupa. Evita la desalineacion.
+function freeHeaderActive(store, chrome) {
+  return !!(Number(store && store.id) === 11 && chrome && chrome.layout === 'free'
+    && typeof chrome.canvasHtml === 'string' && chrome.canvasHtml.trim());
+}
+
+// Barra de busqueda desplegable (oculta por defecto) que la lupa del lienzo abre.
+// Cae justo debajo del encabezado, estetica sobria del storefront. Una por pagina.
+function wbCanvasSearchBarHtml() {
+  return '<div id="wbCanvasSearch" style="display:none;background:#ffffff;border-bottom:1px solid #eef0f3;padding:12px 16px;">'
+    + '<div style="max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:10px;">'
+    + '<span style="display:inline-flex;flex-shrink:0;">' + wbMagnifier(18, '#6b7280') + '</span>'
+    + '<input id="wbCanvasSearchInput" type="text" autocomplete="off" placeholder="Buscar productos..." aria-label="Buscar productos" style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:999px;padding:9px 14px;font-size:15px;outline:none;color:#1f2430;background:#f7f8fa;">'
+    + '</div></div>';
+}
+
+// Runtime que cablea la lupa del lienzo. PORTADA (isProduct=false): filtra el
+// catalogo en vivo (respeta el chip de categoria activo, mismas clases que
+// wbSearchRuntime) y lee ?q= para pre-filtrar al llegar desde una ficha. FICHA
+// (isProduct=true): no hay grilla -> Enter lleva a la portada con ?q=. iconId ya
+// viene saneado [A-Za-z0-9_-]; homeHref es relativo ('./' portada, '../../' ficha).
+function wbCanvasSearchRuntime(iconId, isProduct, homeHref) {
+  const portada = `
+  function txt(c){var t=c.querySelector(".card-title");return (t?(t.textContent||""):"").toLowerCase();}
+  function apply(){var ab=document.querySelector("[data-catbtn].on");var sel=ab?ab.getAttribute("data-catbtn"):"";var q=(inp.value||"").trim().toLowerCase();var cards=document.querySelectorAll(".card[data-cat]");for(var i=0;i<cards.length;i++){var c=cards[i];var catOk=!sel||c.getAttribute("data-cat")===sel;var nameOk=!q||txt(c).indexOf(q)>=0;c.style.display=(catOk&&nameOk)?"":"none";}}
+  inp.addEventListener("input",apply);
+  document.addEventListener("click",function(e){var z=e.target;if(z&&z.closest&&z.closest("[data-catbtn]")){setTimeout(apply,0);}});
+  try{var qp=new URLSearchParams(window.location.search).get("q");if(qp){inp.value=qp;bar.style.display="block";apply();}}catch(e){}`;
+  const ficha = `
+  inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var q=(inp.value||"").trim();window.location.href=${JSON.stringify(String(homeHref || '../../'))}+(q?("?q="+encodeURIComponent(q)):"");}});`;
+  return `<script>(function(){
+  var ICON=${JSON.stringify(String(iconId))};
+  var bar=document.getElementById("wbCanvasSearch");
+  var inp=document.getElementById("wbCanvasSearchInput");
+  if(!bar||!inp){return;}
+  document.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest){return;}
+    if(t.closest('[data-wb-obj="'+ICON+'"]')){e.preventDefault();var open=bar.style.display!=="none"&&bar.style.display!=="";bar.style.display=open?"none":"block";if(!open){inp.focus();}}
+  });
+  inp.addEventListener("keydown",function(e){if(e.key==="Escape"){bar.style.display="none";}});
+  ${isProduct ? ficha : portada}
+})();</script>`;
+}
+
 // --- Render de la pagina completa ---
 
 // Decodifica la config (base64 unicode-safe) del marcador del catalogo
@@ -1084,7 +1160,17 @@ export function renderStorePage({ store, products, bakedAt }) {
   // header (chrome on) -> decide si inyectamos el runtime de filtrado.
   const searchOn = Number(store && store.id) === 11;
   const hasBlockSearch = searchOn && customHtml.includes('<!--WB_SEARCH:');
-  const hasSearch = hasBlockSearch || (searchOn && chromeOn);
+  // [Buscador lienzo libre #781] id de la lupa decorativa del encabezado libre
+  // (modo free CON canvasHtml; ver freeHeaderActive). '' si no aplica -> sin barra
+  // ni runtime, portada byte-identica.
+  const isFreeLayout = freeHeaderActive(store, chrome);
+  const csIconId = (searchOn && chromeOn && isFreeLayout) ? freeCanvasSearchIconId(chrome) : '';
+  // wbSearchRuntime (filtro del bloque/lupa clasica) solo si hay bloque o header
+  // CLASICO con lupa. SOLO en el header libre REAL la lupa clasica no se pinta ->
+  // ese runtime quedaria huerfano; ahi manda wbCanvasSearchRuntime. Si layout='free'
+  // pero canvasHtml esta vacio, chromeHeaderHtml cae a clasico -> isFreeLayout es
+  // falso -> wbSearchRuntime SE EMITE (la lupa clasica sigue viva). Sin regresion.
+  const hasSearch = hasBlockSearch || (searchOn && chromeOn && !isFreeLayout);
   if (hasBlockSearch) {
     mainContent = mainContent.replace(/<!--WB_SEARCH:([\s\S]*?)-->/g, (m, b64) => {
       let cfg = {};
@@ -1112,6 +1198,7 @@ export function renderStorePage({ store, products, bakedAt }) {
 </head>
 <body${chromeOn ? ' class="pp-chrome-on"' : ''}>
   ${headerHtml}
+  ${csIconId ? wbCanvasSearchBarHtml() : ''}
   ${heroHtml}
   <main>
     ${mainContent}
@@ -1123,6 +1210,7 @@ ${cartShellHtml(store)}
 
   ${runtimeScripts(storeJs, productMap)}
   ${hasSearch ? wbSearchRuntime() : ''}
+  ${csIconId ? wbCanvasSearchRuntime(csIconId, false, './') : ''}
 </body>
 </html>`;
 }
@@ -1475,6 +1563,10 @@ export function renderProductPage({ store, product, products, bakedAt }) {
     ? chromeHeaderHtml(store, chrome, product)
     : `<nav class="pp-top"><a href="../../">← Volver a ${esc(storeName)}</a></nav>`;
   const footerHtml = (chromeOn && !fullPage) ? chromeFooterHtml(store, chrome) : '';
+  // [Buscador lienzo libre #781] misma lupa decorativa del encabezado libre (free
+  // CON canvasHtml; ver freeHeaderActive). En la ficha no hay grilla -> Enter lleva
+  // a la portada con ?q=. '' si no aplica.
+  const csIconId = (chromeOn && freeHeaderActive(store, chrome)) ? freeCanvasSearchIconId(chrome) : '';
 
   return `<!doctype html>
 <html lang="es">
@@ -1494,6 +1586,7 @@ export function renderProductPage({ store, product, products, bakedAt }) {
 </head>
 <body class="pp-page${chromeOn ? ' pp-chrome-on' : ''}">
   ${headerHtml}
+  ${csIconId ? wbCanvasSearchBarHtml() : ''}
   <main class="pp-wrap"${fullPage ? ' style="max-width:none;padding:0"' : ''}>
     ${mainInner}
   </main>
@@ -1507,6 +1600,7 @@ ${cartShellHtml(store)}
   ${runtimeScripts(storeJs, productMap)}
   <script>${galleryScript}</script>
   ${fullPageBuyScript}
+  ${csIconId ? wbCanvasSearchRuntime(csIconId, true, '../../') : ''}
 </body>
 </html>`;
 }
